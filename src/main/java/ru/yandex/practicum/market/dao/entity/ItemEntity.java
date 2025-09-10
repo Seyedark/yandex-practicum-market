@@ -49,10 +49,7 @@ public class ItemEntity {
     private Integer quantity;
 
     public String getImageBase64() {
-        if (image != null) {
-            return java.util.Base64.getEncoder().encodeToString(image);
-        }
-        return null;
+        return java.util.Base64.getEncoder().encodeToString(image);
     }
 
     @OneToMany(mappedBy = "item", cascade = CascadeType.ALL, orphanRemoval = true)

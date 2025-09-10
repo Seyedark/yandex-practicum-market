@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <title>Заказ</title>
+</head>
+
+<body>
+<a href="/orders" style="float:right;">
+    <b>ЗАКАЗЫ &cudarrr;</b>
+</a>
+<a href="/cart" style="float:right;">
+    <b>КОРЗИНА &cudarrr;</b>
+</a>
+<a href="/" style="float:right;">
+    <b>ГЛАВНАЯ &cudarrr;</b>
+</a>
+<h1 style="text-align:center">Поздравляем! Успешная покупка! &#128578;</h1>
+<table style="width:70%;margin-left:auto;margin-right:auto;">
+    <tr>
+        <td>
+            <h2 th:text="${'Заказ №'+order.getId()}"></h2>
+        </td>
+    </tr>
+    <tr th:each="item : ${items}">
+        <td>
+            <table>
+                <tr>
+                    <td>
+                        <img width="300" height="300" th:src="'data:image/jpeg;base64,' + ${item.imageBase64}">
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        <b th:text="${item.getName()}"></b>
+                    </td>
+                    <td>
+                        <b th:text="${item.getQuantity()}+' шт.'"></b>
+                    </td>
+                    <td>
+                        <b th:text="${item.getPrice()*item.getQuantity()}+' руб.'"></b>
+                    </td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+    <tr>
+        <td>
+            <h3 th:text="${'Сумма: '+order.getTotalAmount()}+' руб.'"></h3>
+        </td>
+    </tr>
+</table>
+</body>
+</html>

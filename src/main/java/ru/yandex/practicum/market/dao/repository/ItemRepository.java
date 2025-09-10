@@ -13,9 +13,10 @@ import java.util.List;
 @Repository
 public interface ItemRepository extends JpaRepository<ItemEntity, Long> {
 
-    @Query("SELECT new ru.yandex.practicum.market.dao.entity.ItemEntity(i.id, i.name, i.description, i.price, i.image, COALESCE(oi.quantity, 0)) FROM ItemEntity i " +
-            "LEFT JOIN OrderItemEntity oi on i.id = oi.item.id " +
-            "LEFT JOIN OrderEntity o ON oi.order.id = (:orderId) " +
+    @Query("SELECT new ru.yandex.practicum.market.dao.entity.ItemEntity(i.id, i.name, i.description, i.price, i.image, 0) FROM ItemEntity i " +
             "WHERE (:name is null or :name = '' or i.name ilike %:name%)")
-    Page<ItemEntity> getAllItemsByConditions(@Param("orderId")Long orderId, @Param("name") String name, Pageable pageable);
+    Page<ItemEntity> getAllItemsByConditionsForNewOrder(@Param("name") String name, Pageable pageable);
+
+    @Query("SELECT i FROM ItemEntity i WHERE (:name is null or :name = '' or i.name ilike %:name%)")
+    Page<ItemEntity> getAllItemsByConditions(@Param("name") String name, Pageable pageable);
 }

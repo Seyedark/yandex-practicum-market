@@ -63,9 +63,12 @@
             <table>
                 <tr>
                     <td>
-                        <a th:href="${item.getName()}">
-                            <img width="300" height="300" th:src="'data:image/jpeg;base64,' + ${item.imageBase64}">
-                        </a>
+                        <form th:action="@{/item}" method="post">
+                            <input type="hidden" name="id" th:value="${item.getId()}"/>
+                            <button type="submit" style="border:none; background:none; padding:0;">
+                                <img width="300" height="300" th:src="'data:image/jpeg;base64,' + ${item.imageBase64}"/>
+                            </button>
+                        </form>
                     </td>
                 </tr>
                 <tr>

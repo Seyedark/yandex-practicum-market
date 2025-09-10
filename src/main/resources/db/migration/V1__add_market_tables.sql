@@ -7,14 +7,12 @@ CREATE TABLE items (
     image BYTEA NOT NULL
 );
 
-
 CREATE TABLE orders (
     id BIGSERIAL PRIMARY KEY,
     status VARCHAR(20) NOT NULL,
     total_amount DECIMAL(10, 2) DEFAULT 0
 );
 
--- Таблица элементов заказа
 CREATE TABLE orders_items (
     id BIGSERIAL PRIMARY KEY,
     orders_id BIGINT NOT NULL,
@@ -24,7 +22,6 @@ CREATE TABLE orders_items (
     FOREIGN KEY (orders_id) REFERENCES orders(id) ON DELETE CASCADE,
     FOREIGN KEY (items_id) REFERENCES items(id) ON DELETE CASCADE
 );
-
 
 -- Ужасный способ хранения картинок в БД, но для тестового приложения подойдёт
 INSERT INTO items (name, description, price, image) VALUES

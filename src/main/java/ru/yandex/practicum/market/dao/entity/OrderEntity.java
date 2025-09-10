@@ -25,5 +25,5 @@ public class OrderEntity {
     private BigDecimal totalAmount;
 
     @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<OrderItemEntity> orderItems = new ArrayList<>();
+    private List<OrderItemEntity> orderItem = new ArrayList<>();
 }
