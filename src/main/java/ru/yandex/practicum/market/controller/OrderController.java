@@ -3,7 +3,10 @@ package ru.yandex.practicum.market.controller;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import ru.yandex.practicum.market.dao.entity.ItemEntity;
 import ru.yandex.practicum.market.dao.entity.OrderEntity;
 import ru.yandex.practicum.market.enums.OrderStatusEnum;
@@ -19,9 +22,8 @@ public class OrderController {
     private final OrderService orderService;
     private final CoordinatorService coordinatorService;
 
-    @GetMapping
-    @RequestMapping("/cart")
-    public String getAllItemsByConditions(Model model) {
+    @GetMapping("/cart")
+    public String getCart(Model model) {
         OrderEntity orderEntity = orderService.findCartOrder();
 
         List<ItemEntity> entityList = extractItemsFromOrder(orderEntity);
@@ -31,8 +33,7 @@ public class OrderController {
         return "cart";
     }
 
-    @GetMapping
-    @RequestMapping("/cart/items/{id}")
+    @PostMapping("/cart/items/{id}")
     public String changeItemsInOrder(@PathVariable("id") Long id,
                                      @RequestParam("action") String action,
                                      @RequestParam("form") String form) {
@@ -46,33 +47,23 @@ public class OrderController {
         }
     }
 
-    @PostMapping
-    @RequestMapping("/buy")
+    @PostMapping("/buy")
     public String buy(Model model) {
         OrderEntity orderEntity = orderService.closeOrder();
-        List<ItemEntity> itemEntityList = orderEntity.getOrderItem()
-                .stream()
-                .map(orderItem -> {
-                    ItemEntity item = orderItem.getItem();
-                    item.setQuantity(orderItem.getQuantity());
-                    return item;
-                })
-                .toList();
+
         model.addAttribute("order", orderEntity);
-        model.addAttribute("items", itemEntityList);
+        model.addAttribute("items", extractItemsFromOrder(orderEntity));
         return "order";
     }
 
-    @GetMapping
-    @RequestMapping("/orders")
+    @GetMapping("/orders")
     public String getAllOrders(Model model) {
         List<OrderEntity> orderEntityList = orderService.findOrderByStatus(OrderStatusEnum.ORDER.name());
         model.addAttribute("orders", orderEntityList);
         return "orders";
     }
 
-    @GetMapping
-    @RequestMapping("/orders/{id}")
+    @GetMapping("/orders/{id}")
     public String getClosedOrder(@PathVariable("id") Long id,
                                  Model model) {
         OrderEntity orderEntity = orderService.findById(id);

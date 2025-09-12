@@ -5,8 +5,6 @@ import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import ru.yandex.practicum.market.dao.entity.ItemEntity;
 import ru.yandex.practicum.market.dao.entity.OrderEntity;
@@ -22,8 +20,7 @@ public class ItemController {
     private final OrderService orderService;
     private final CoordinatorService coordinatorService;
 
-    @GetMapping
-    @RequestMapping("/")
+    @GetMapping("/")
     public String getAllItemsByConditions(@RequestParam(name = "search", required = false) String search,
                                           @RequestParam(name = "sortBy", defaultValue = "NO") String sort,
                                           @RequestParam(name = "page", defaultValue = "1") int page,
@@ -32,6 +29,7 @@ public class ItemController {
         OrderEntity orderEntity = orderService.findCartOrder();
 
         Page<ItemEntity> itemEntityList = itemService.getAllItemsByConditions(orderEntity, search, sort, page, pageSize);
+
         int totalPages = itemEntityList.getTotalPages() == 0 ? 1 : itemEntityList.getTotalPages();
 
         model.addAttribute("currentSize", pageSize);
@@ -42,10 +40,9 @@ public class ItemController {
         return "main";
     }
 
-    @PostMapping
-    @RequestMapping("/item")
+    @GetMapping("/item")
     public String getItemById(@RequestParam("id") Long id,
-                                          Model model) {
+                              Model model) {
         ItemEntity itemEntity = coordinatorService.getItemById(id);
         model.addAttribute("item", itemEntity);
         return "item";

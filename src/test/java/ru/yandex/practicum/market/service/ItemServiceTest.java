@@ -5,12 +5,10 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
-import org.springframework.transaction.annotation.Transactional;
 import ru.yandex.practicum.market.SpringBootPostgreSQLBase;
 import ru.yandex.practicum.market.dao.entity.ItemEntity;
 import ru.yandex.practicum.market.dao.entity.OrderEntity;
 import ru.yandex.practicum.market.dao.entity.OrderItemEntity;
-import ru.yandex.practicum.market.dao.repository.OrderItemRepository;
 import ru.yandex.practicum.market.dao.repository.OrderRepository;
 import ru.yandex.practicum.market.enums.OrderStatusEnum;
 import ru.yandex.practicum.market.enums.SortEnum;
@@ -27,14 +25,10 @@ public class ItemServiceTest extends SpringBootPostgreSQLBase {
     OrderRepository orderRepository;
 
     @Autowired
-    OrderItemRepository orderItemRepository;
-
-    @Autowired
     ItemService service;
 
     @BeforeEach
     void cleanup() {
-        orderItemRepository.deleteAll();
         orderRepository.deleteAll();
     }
 

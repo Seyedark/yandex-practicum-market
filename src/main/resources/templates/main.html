@@ -63,7 +63,7 @@
             <table>
                 <tr>
                     <td>
-                        <form th:action="@{/item}" method="post">
+                        <form th:action="@{/item}" method="get">
                             <input type="hidden" name="id" th:value="${item.getId()}"/>
                             <button type="submit" style="border:none; background:none; padding:0;">
                                 <img width="300" height="300" th:src="'data:image/jpeg;base64,' + ${item.imageBase64}"/>

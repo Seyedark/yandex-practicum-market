@@ -6,7 +6,6 @@ import org.springframework.transaction.annotation.Transactional;
 import ru.yandex.practicum.market.dao.entity.ItemEntity;
 import ru.yandex.practicum.market.dao.entity.OrderEntity;
 import ru.yandex.practicum.market.dao.entity.OrderItemEntity;
-import ru.yandex.practicum.market.dao.repository.OrderItemRepository;
 import ru.yandex.practicum.market.enums.ActionEnum;
 
 import java.math.BigDecimal;
@@ -21,7 +20,6 @@ public class CoordinatorService {
 
     private final OrderService orderService;
 
-    private final OrderItemRepository orderItemRepository;
 
     @Transactional
     public void changeItemsInOrder(Long id, String action) {
@@ -30,6 +28,7 @@ public class CoordinatorService {
             OrderItemEntity orderItemEntity;
             if (orderEntity.getOrderItem().isEmpty()) {
                 orderItemEntity = initializeNewOrderItemEntity(id, orderEntity);
+                orderEntity.getOrderItem().add(orderItemEntity);
             } else {
                 Optional<OrderItemEntity> optionalOrderItemEntity = orderEntity
                         .getOrderItem()
@@ -42,10 +41,10 @@ public class CoordinatorService {
                     orderEntity.setTotalAmount(orderEntity.getTotalAmount().add(orderItemEntity.getItem().getPrice()));
                 } else {
                     orderItemEntity = initializeNewOrderItemEntity(id, orderEntity);
+                    orderEntity.getOrderItem().add(orderItemEntity);
                 }
             }
             orderService.save(orderEntity);
-            orderItemRepository.save(orderItemEntity);
         } else if (action.equals(ActionEnum.MINUS.name())) {
             decreaseQuantity(id, orderEntity);
         } else {
@@ -59,7 +58,6 @@ public class CoordinatorService {
         }
     }
 
-    @Transactional
     public ItemEntity getItemById(Long id) {
         ItemEntity itemEntity = itemService.findById(id);
         OrderEntity orderEntity = orderService.findCartOrder();
@@ -89,9 +87,9 @@ public class CoordinatorService {
     private void deleteOrderItemEntity(OrderEntity orderEntity, OrderItemEntity orderItemEntity) {
         BigDecimal decreaseAmount = orderItemEntity.getItem().getPrice()
                 .multiply(BigDecimal.valueOf(orderItemEntity.getQuantity()));
-        orderEntity.getOrderItem().remove(orderItemEntity);
         orderEntity.setTotalAmount(orderEntity.getTotalAmount().subtract(decreaseAmount));
-        orderItemRepository.delete(orderItemEntity);
+        orderEntity.getOrderItem().remove(orderItemEntity);
+        orderService.save(orderEntity);
     }
 
     private void decreaseQuantity(Long id, OrderEntity orderEntity) {
@@ -101,15 +99,16 @@ public class CoordinatorService {
                 .filter(x -> x.getItem().getId().equals(id) &&
                         x.getOrder().getId().equals(orderEntity.getId()))
                 .findFirst();
-        OrderItemEntity orderItemEntity = optionalOrderItemEntity.get();
-        int quantity = orderItemEntity.getQuantity() - 1;
-        if (quantity > 0) {
-            orderItemEntity.setQuantity(orderItemEntity.getQuantity() - 1);
-            orderEntity.setTotalAmount(orderEntity.getTotalAmount().subtract(orderItemEntity.getItem().getPrice()));
-            orderService.save(orderEntity);
-            orderItemRepository.save(orderItemEntity);
-        } else {
-            deleteOrderItemEntity(orderEntity, orderItemEntity);
+        if (optionalOrderItemEntity.isPresent()) {
+            OrderItemEntity orderItemEntity = optionalOrderItemEntity.get();
+            int newQuantity = orderItemEntity.getQuantity() - 1;
+            if (newQuantity > 0) {
+                orderItemEntity.setQuantity(newQuantity);
+                orderEntity.setTotalAmount(orderEntity.getTotalAmount().subtract(orderItemEntity.getItem().getPrice()));
+                orderService.save(orderEntity);
+            } else {
+                deleteOrderItemEntity(orderEntity, orderItemEntity);
+            }
         }
     }
 }
