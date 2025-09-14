@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+
+<head>
+    <title>Витрина товаров</title>
+</head>
+
+<body>
+<a href="/orders" style="float:right;">
+    <b>ЗАКАЗЫ &cudarrr;</b>
+</a>
+<a href="/cart" style="float:right;">
+    <b>КОРЗИНА &cudarrr;</b>
+</a>
+<table style="width:70%;margin-left:auto;margin-right:auto;">
+    <tr>
+        <td>
+            <form>
+                <p>
+                    <label for="search">Найти: </label>
+                    <input id="search" style="width:300px;" name="search" th:value="${search}">
+                    <button name="action">&#128269;</button>
+                </p>
+                <p>
+                    <label for="sortBy">Сортировка: </label>
+                    <select id="sortBy" name="sortBy" onchange="this.form.submit()">
+                        <option value="NO" th:selected="${sort=='NO'}">нет</option>
+                        <option value="NAME" th:selected="${sort=='NAME'}">по алфавиту</option>
+                        <option value="PRICE" th:selected="${sort=='PRICE'}">по цене</option>
+                    </select>
+                </p>
+                <p>
+                    <label for="pageSize">Число товаров: </label>
+                    <select id="pageSize" name="pageSize" onchange="this.form.submit()">
+                        <option value="5" th:selected="${currentSize==5}">5</option>
+                        <option value="10" th:selected="${currentSize==10}">10</option>
+                        <option value="20" th:selected="${currentSize==20}">20</option>
+                        <option value="50" th:selected="${currentSize==50}">50</option>
+                        <option value="100" th:selected="${currentSize==100}">100</option>
+                    </select>
+                </p>
+                <p>
+                    <button th:if="${currentPage > 1}"
+                            type="submit"
+                            name="page"
+                            th:value="${currentPage - 1}">&lt;
+                    </button>
+
+                    <span th:if="${totalPages > 0}"
+                          th:text="'Страница ' + ${currentPage} + ' из ' + ${totalPages}"></span>
+
+                    <button th:if="${currentPage < totalPages}"
+                            type="submit"
+                            name="page"
+                            th:value="${currentPage + 1}">&gt;
+                    </button>
+                </p>
+            </form>
+        </td>
+    </tr>
+    <tr th:each="itemsRow : ${items}">
+        <td th:each="item : ${itemsRow}">
+            <table>
+                <tr>
+                    <td>
+                        <form th:action="@{/item}" method="get">
+                            <input type="hidden" name="id" th:value="${item.getId()}"/>
+                            <button type="submit" style="border:none; background:none; padding:0;">
+                                <img width="300" height="300" th:src="'data:image/jpeg;base64,' + ${item.imageBase64}"/>
+                            </button>
+                        </form>
+                    </td>
+                </tr>
+                <tr>
+                    <td>
+                        <b th:text="${item.getName()}"></b>
+                    </td>
+                    <td>
+                        <b th:text="${item.getPrice()}+' руб.'"></b>
+                    </td>
+                </tr>
+                <tr>
+                    <td th:text="${item.getDescription()}"></td>
+                </tr>
+                <tr>
+                    <td>
+                        <form th:action="${'/cart/items/'+item.getId()}" method="post">
+                            <input type="hidden" name="form" th:value="main"/>
+                            <button name="action" value="MINUS" th:if="${item.getQuantity()!=0}">-</button>
+                            <span th:text="${item.getQuantity()}"></span>
+                            <button name="action" value="PLUS">+</button>
+                        </form>
+                    </td>
+                </tr>
+            </table>
+        </td>
+    </tr>
+</table>
+</body>
+</html>
