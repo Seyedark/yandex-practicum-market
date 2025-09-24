@@ -1,0 +1,22 @@
+package ru.yandex.practicum.market.dao.repository;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
+import org.springframework.stereotype.Repository;
+import ru.yandex.practicum.market.dao.entity.ItemEntity;
+
+import java.util.List;
+
+@Repository
+public interface ItemRepository extends JpaRepository<ItemEntity, Long> {
+
+    @Query("SELECT new ru.yandex.practicum.market.dao.entity.ItemEntity(i.id, i.name, i.description, i.price, i.image, 0) FROM ItemEntity i " +
+            "WHERE (:name is null or :name = '' or i.name ilike %:name%)")
+    Page<ItemEntity> getAllItemsByConditionsForNewOrder(@Param("name") String name, Pageable pageable);
+
+    @Query("SELECT i FROM ItemEntity i WHERE (:name is null or :name = '' or i.name ilike %:name%)")
+    Page<ItemEntity> getAllItemsByConditions(@Param("name") String name, Pageable pageable);
+}
