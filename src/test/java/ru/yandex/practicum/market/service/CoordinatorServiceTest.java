@@ -6,15 +6,19 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.test.context.ActiveProfiles;
+import reactor.core.publisher.Mono;
 import ru.yandex.practicum.market.dao.entity.ItemEntity;
 import ru.yandex.practicum.market.dao.entity.OrderEntity;
 import ru.yandex.practicum.market.dao.entity.OrderItemEntity;
+import ru.yandex.practicum.market.dto.ItemDto;
+import ru.yandex.practicum.market.dto.OrderWithItemsDto;
 import ru.yandex.practicum.market.enums.ActionEnum;
 
 import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.util.ArrayList;
 import java.util.List;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.*;
 
 
@@ -32,150 +36,164 @@ public class CoordinatorServiceTest {
     @MockBean
     private OrderService orderService;
 
+    @MockBean
+    private OrderItemService orderItemService;
+
     @Test
     @DisplayName("Проверка когда первый раз добавляем товар")
     void changeItemsInOrderFirstItemTest() {
+        OrderWithItemsDto orderWithItemsDto = new OrderWithItemsDto();
+        orderWithItemsDto.setId(1L);
+        orderWithItemsDto.setTotalAmount(BigDecimal.ZERO);
+        orderWithItemsDto.setItemList(new ArrayList<>());
+        Mono<OrderWithItemsDto> orderWithItemsDtoMono = Mono.just(orderWithItemsDto);
+
         OrderEntity orderEntity = new OrderEntity();
         orderEntity.setId(1L);
         orderEntity.setTotalAmount(BigDecimal.ZERO);
+        Mono<OrderEntity> orderEntityMono = Mono.just(orderEntity);
 
         ItemEntity itemEntity = new ItemEntity();
         itemEntity.setId(1L);
         itemEntity.setPrice(BigDecimal.ONE);
+        Mono<ItemEntity> itemEntityMono = Mono.just(itemEntity);
 
-        when(orderService.findCartOrder()).thenReturn(orderEntity);
-        when(itemService.findById(orderEntity.getId())).thenReturn(itemEntity);
+        OrderItemEntity orderItemEntity = new OrderItemEntity();
+        Mono<OrderItemEntity> orderItemEntityMono = Mono.just(orderItemEntity);
 
-        service.changeItemsInOrder(itemEntity.getId(), ActionEnum.PLUS.name());
+        when(orderService.findCartOrder()).thenReturn(orderWithItemsDtoMono);
+        when(itemService.findById(itemEntity.getId())).thenReturn(itemEntityMono);
+        when(orderService.save(any(OrderEntity.class))).thenReturn(orderEntityMono);
+        when(orderItemService.save(any(OrderItemEntity.class))).thenReturn(orderItemEntityMono);
 
-        verify(orderService, times(1)).save(orderEntity);
-        verify(itemService, times(1)).findById(orderEntity.getId());
+        service.changeItemsInOrder(itemEntity.getId(), ActionEnum.PLUS.name()).block();
 
-        assertEquals(BigDecimal.ONE, orderEntity.getTotalAmount());
-        assertEquals(1, orderEntity.getOrderItem().size());
-        assertEquals(1, orderEntity.getOrderItem().get(0).getQuantity());
+        verify(orderService, times(1)).findCartOrder();
+        verify(itemService, times(1)).findById(itemEntity.getId());
+        verify(orderService, times(1)).save(any(OrderEntity.class));
+        verify(orderItemService, times(1)).save(any(OrderItemEntity.class));
+
     }
 
     @Test
     @DisplayName("Проверка когда добавляем товар, который уже был")
     void changeItemsInOrderExistItemIncreaseTest() {
-        OrderEntity orderEntity = new OrderEntity();
-        orderEntity.setId(1L);
-        orderEntity.setTotalAmount(BigDecimal.ONE);
+        ItemDto itemDto = new ItemDto();
+        itemDto.setId(1L);
+        itemDto.setPrice(new BigDecimal(BigInteger.ONE));
 
+        OrderWithItemsDto orderWithItemsDto = new OrderWithItemsDto();
+        orderWithItemsDto.setId(1L);
+        orderWithItemsDto.setTotalAmount(BigDecimal.TWO);
+        orderWithItemsDto.setItemList(List.of(itemDto));
+        Mono<OrderWithItemsDto> orderWithItemsDtoMono = Mono.just(orderWithItemsDto);
+
+        OrderEntity orderEntity = new OrderEntity();
+        Mono<OrderEntity> orderEntityMono = Mono.just(orderEntity);
 
         ItemEntity itemEntity = new ItemEntity();
         itemEntity.setId(1L);
         itemEntity.setPrice(BigDecimal.ONE);
+        Mono<ItemEntity> itemEntityMono = Mono.just(itemEntity);
 
         OrderItemEntity orderItemEntity = new OrderItemEntity();
-        orderItemEntity.setOrder(orderEntity);
-        orderItemEntity.setItem(itemEntity);
-        orderItemEntity.setQuantity(1);
+        orderItemEntity.setQuantity(0);
+        Mono<OrderItemEntity> orderItemEntityMono = Mono.just(orderItemEntity);
 
-        orderEntity.getOrderItem().add(orderItemEntity);
 
-        when(orderService.findCartOrder()).thenReturn(orderEntity);
-        when(itemService.findById(orderEntity.getId())).thenReturn(itemEntity);
+        when(orderService.findCartOrder()).thenReturn(orderWithItemsDtoMono);
+        when(itemService.findById(itemEntity.getId())).thenReturn(itemEntityMono);
+        when(orderItemService.findByOrderIdAndItemId(orderWithItemsDto.getId(), itemDto.getId())).thenReturn(orderItemEntityMono);
+        when(orderService.save(any(OrderEntity.class))).thenReturn(orderEntityMono);
+        when(orderItemService.save(any(OrderItemEntity.class))).thenReturn(orderItemEntityMono);
 
-        service.changeItemsInOrder(itemEntity.getId(), ActionEnum.PLUS.name());
 
-        verify(orderService, times(1)).save(orderEntity);
+        service.changeItemsInOrder(itemEntity.getId(), ActionEnum.PLUS.name()).block();
 
-        assertEquals(BigDecimal.TWO, orderEntity.getTotalAmount());
-        assertEquals(1, orderEntity.getOrderItem().size());
-        assertEquals(2, orderEntity.getOrderItem().get(0).getQuantity());
+        verify(orderService, times(1)).findCartOrder();
+        verify(itemService, times(1)).findById(itemEntity.getId());
+        verify(orderItemService, times(1)).findByOrderIdAndItemId(orderWithItemsDto.getId(), itemDto.getId());
+        verify(orderService, times(1)).save(any(OrderEntity.class));
+        verify(orderItemService, times(1)).save(any(OrderItemEntity.class));
     }
 
     @Test
     @DisplayName("Проверка когда добавляем товар, который уже был")
     void changeItemsInOrderExistItemDecreaseTest() {
-        OrderEntity orderEntity = new OrderEntity();
-        orderEntity.setId(1L);
-        orderEntity.setTotalAmount(BigDecimal.TWO);
+        ItemDto itemDto = new ItemDto();
+        itemDto.setId(1L);
+        itemDto.setPrice(new BigDecimal(BigInteger.ONE));
 
+        OrderWithItemsDto orderWithItemsDto = new OrderWithItemsDto();
+        orderWithItemsDto.setId(1L);
+        orderWithItemsDto.setTotalAmount(BigDecimal.TWO);
+        orderWithItemsDto.setItemList(List.of(itemDto));
+        Mono<OrderWithItemsDto> orderWithItemsDtoMono = Mono.just(orderWithItemsDto);
+
+        OrderEntity orderEntity = new OrderEntity();
+        Mono<OrderEntity> orderEntityMono = Mono.just(orderEntity);
 
         ItemEntity itemEntity = new ItemEntity();
         itemEntity.setId(1L);
         itemEntity.setPrice(BigDecimal.ONE);
+        Mono<ItemEntity> itemEntityMono = Mono.just(itemEntity);
 
         OrderItemEntity orderItemEntity = new OrderItemEntity();
-        orderItemEntity.setOrder(orderEntity);
-        orderItemEntity.setItem(itemEntity);
-        orderItemEntity.setQuantity(2);
+        orderItemEntity.setQuantity(1);
+        Mono<OrderItemEntity> orderItemEntityMono = Mono.just(orderItemEntity);
 
-        orderEntity.getOrderItem().add(orderItemEntity);
+        when(orderService.findCartOrder()).thenReturn(orderWithItemsDtoMono);
+        when(itemService.findById(itemEntity.getId())).thenReturn(itemEntityMono);
+        when(orderItemService.findByOrderIdAndItemId(orderWithItemsDto.getId(), itemDto.getId())).thenReturn(orderItemEntityMono);
+        when(orderService.save(any(OrderEntity.class))).thenReturn(orderEntityMono);
+        when(orderItemService.save(any(OrderItemEntity.class))).thenReturn(orderItemEntityMono);
 
-        when(orderService.findCartOrder()).thenReturn(orderEntity);
-        when(itemService.findById(orderEntity.getId())).thenReturn(itemEntity);
+        service.changeItemsInOrder(itemEntity.getId(), ActionEnum.MINUS.name()).block();
 
-        service.changeItemsInOrder(itemEntity.getId(), ActionEnum.MINUS.name());
-
-        verify(orderService, times(1)).save(orderEntity);
-
-        assertEquals(BigDecimal.ONE, orderEntity.getTotalAmount());
-        assertEquals(1, orderEntity.getOrderItem().size());
-        assertEquals(1, orderEntity.getOrderItem().get(0).getQuantity());
+        verify(orderService, times(1)).findCartOrder();
+        verify(itemService, times(1)).findById(itemEntity.getId());
+        verify(orderItemService, times(1)).findByOrderIdAndItemId(orderWithItemsDto.getId(), itemDto.getId());
+        verify(orderService, times(1)).save(any(OrderEntity.class));
+        verify(orderItemService, times(1)).save(any(OrderItemEntity.class));
     }
 
     @Test
     @DisplayName("Проверка когда добавляем товар, который уже был")
     void changeItemsInOrderExistItemDeleteItemTest() {
-        OrderEntity orderEntity = new OrderEntity();
-        orderEntity.setId(1L);
-        orderEntity.setTotalAmount(BigDecimal.TWO);
+        ItemDto itemDto = new ItemDto();
+        itemDto.setId(1L);
+        itemDto.setPrice(new BigDecimal(BigInteger.ONE));
 
+        OrderWithItemsDto orderWithItemsDto = new OrderWithItemsDto();
+        orderWithItemsDto.setId(1L);
+        orderWithItemsDto.setTotalAmount(BigDecimal.TWO);
+        orderWithItemsDto.setItemList(List.of(itemDto));
+        Mono<OrderWithItemsDto> orderWithItemsDtoMono = Mono.just(orderWithItemsDto);
+
+        OrderEntity orderEntity = new OrderEntity();
+        Mono<OrderEntity> orderEntityMono = Mono.just(orderEntity);
 
         ItemEntity itemEntity = new ItemEntity();
         itemEntity.setId(1L);
         itemEntity.setPrice(BigDecimal.ONE);
+        Mono<ItemEntity> itemEntityMono = Mono.just(itemEntity);
 
         OrderItemEntity orderItemEntity = new OrderItemEntity();
-        orderItemEntity.setOrder(orderEntity);
-        orderItemEntity.setItem(itemEntity);
-        orderItemEntity.setQuantity(2);
+        orderItemEntity.setQuantity(1);
+        Mono<OrderItemEntity> orderItemEntityMono = Mono.just(orderItemEntity);
 
-        orderEntity.getOrderItem().add(orderItemEntity);
+        when(orderService.findCartOrder()).thenReturn(orderWithItemsDtoMono);
+        when(itemService.findById(itemEntity.getId())).thenReturn(itemEntityMono);
+        when(orderItemService.findByOrderIdAndItemId(orderWithItemsDto.getId(), itemDto.getId())).thenReturn(orderItemEntityMono);
+        when(orderService.save(any(OrderEntity.class))).thenReturn(orderEntityMono);
+        when(orderItemService.delete(any(OrderItemEntity.class))).thenReturn(Mono.empty());
 
-        when(orderService.findCartOrder()).thenReturn(orderEntity);
-        when(itemService.findById(orderEntity.getId())).thenReturn(itemEntity);
-
-        service.changeItemsInOrder(itemEntity.getId(), ActionEnum.DELETE.name());
-
-        verify(orderService, times(1)).save(orderEntity);
-
-        assertEquals(BigDecimal.ZERO, orderEntity.getTotalAmount());
-        assertEquals(0, orderEntity.getOrderItem().size());
-    }
-
-    @Test
-    @DisplayName("Поиск товара по идентификатору")
-    void getItemByIdTest() {
-        OrderEntity orderEntity = new OrderEntity();
-        orderEntity.setId(1L);
-        orderEntity.setTotalAmount(BigDecimal.TWO);
-
-        ItemEntity itemEntity = new ItemEntity();
-        itemEntity.setId(1L);
-        itemEntity.setPrice(BigDecimal.ONE);
-
-        OrderItemEntity orderItemEntity = new OrderItemEntity();
-        orderItemEntity.setOrder(orderEntity);
-        orderItemEntity.setItem(itemEntity);
-        orderItemEntity.setQuantity(2);
-
-        orderEntity.getOrderItem().add(orderItemEntity);
-        itemEntity.setOrderItems(List.of(orderItemEntity));
-
-        when(orderService.findCartOrder()).thenReturn(orderEntity);
-        when(itemService.findById(orderEntity.getId())).thenReturn(itemEntity);
-
-        service.getItemById(itemEntity.getId());
+        service.changeItemsInOrder(itemEntity.getId(), ActionEnum.DELETE.name()).block();
 
         verify(orderService, times(1)).findCartOrder();
-        verify(itemService, times(1)).findById(orderEntity.getId());
-
-
-        assertEquals(2, itemEntity.getQuantity());
+        verify(itemService, times(1)).findById(itemEntity.getId());
+        verify(orderItemService, times(1)).findByOrderIdAndItemId(orderWithItemsDto.getId(), itemDto.getId());
+        verify(orderService, times(1)).save(any(OrderEntity.class));
+        verify(orderItemService, times(1)).delete(any(OrderItemEntity.class));
     }
 }

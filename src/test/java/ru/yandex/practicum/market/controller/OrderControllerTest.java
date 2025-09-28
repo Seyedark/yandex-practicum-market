@@ -3,30 +3,35 @@ package ru.yandex.practicum.market.controller;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.autoconfigure.web.reactive.WebFluxTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.web.servlet.MockMvc;
-import ru.yandex.practicum.market.dao.entity.OrderEntity;
+import org.springframework.test.web.reactive.server.WebTestClient;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.reactive.function.BodyInserters;
+import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
+import ru.yandex.practicum.market.dto.OrderWithItemsDto;
 import ru.yandex.practicum.market.enums.ActionEnum;
 import ru.yandex.practicum.market.enums.OrderStatusEnum;
 import ru.yandex.practicum.market.service.CoordinatorService;
 import ru.yandex.practicum.market.service.OrderService;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
 
 import static org.mockito.Mockito.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-@WebMvcTest(OrderController.class)
+@WebFluxTest(OrderController.class)
 @ActiveProfiles("test")
 @DisplayName("Класс для проверки взаимодействия с контроллером заказов")
 public class OrderControllerTest {
 
     @Autowired
-    MockMvc mockMvc;
+    private WebTestClient webTestClient;
 
     @MockBean
     private OrderService orderService;
@@ -36,82 +41,119 @@ public class OrderControllerTest {
 
     @Test
     @DisplayName("Проверка метода получения представления корзины")
-    void getCartTest() throws Exception {
-        OrderEntity orderEntity = new OrderEntity();
-        orderEntity.setTotalAmount(BigDecimal.ONE);
+    void getCartTest() {
+        OrderWithItemsDto orderWithItemsDto = new OrderWithItemsDto();
+        orderWithItemsDto.setTotalAmount(BigDecimal.ONE);
+        orderWithItemsDto.setItemList(new ArrayList<>());
+        Mono<OrderWithItemsDto> orderWithItemsDtoMono = Mono.just(orderWithItemsDto);
 
-        when(orderService.findCartOrder()).thenReturn(orderEntity);
+        when(orderService.findCartOrder()).thenReturn(orderWithItemsDtoMono);
 
-        mockMvc.perform(get("/cart"))
-                .andExpect(status().isOk())
-                .andExpect(view().name("cart"))
-                .andExpect(model().attributeExists("items"))
-                .andExpect(model().attributeExists("total"))
-                .andExpect(model().attributeExists("empty"));
+
+        webTestClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/cart")
+                        .build())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectHeader().contentType(MediaType.TEXT_HTML);
 
         verify(orderService, times(1)).findCartOrder();
     }
 
     @Test
     @DisplayName("Проверка метода изменения кол-ва товара в заказе и редиректа на главную страницу")
-    void changeItemsInOrderTest() throws Exception {
+    void changeItemsInOrderTest() {
         Long id = 1L;
         String action = ActionEnum.PLUS.name();
         String form = "main";
-        mockMvc.perform(post("/cart/items/" + id)
-                        .param("action", action)
-                        .param("form", form))
-                .andExpect(status().is3xxRedirection())
-                .andExpect(redirectedUrl("/"));
+
+        MultiValueMap<String, String> formData = new LinkedMultiValueMap<>();
+        formData.add("action", action);
+        formData.add("form", form);
+
+        when(coordinatorService.changeItemsInOrder(id, action)).thenReturn(Mono.empty());
+
+
+        webTestClient.post()
+                .uri("/cart/items/{id}", id)
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
+                .body(BodyInserters.fromFormData(formData))
+                .exchange()
+                .expectStatus().is3xxRedirection()
+                .expectHeader()
+                .valueMatches("location", "/"); // Проверяем редирект
 
         verify(coordinatorService, times(1)).changeItemsInOrder(id, action);
     }
 
     @Test
     @DisplayName("Проверка метода получения представления завершенного заказа")
-    void buyTest() throws Exception {
-        OrderEntity orderEntity = new OrderEntity();
-        orderEntity.setTotalAmount(BigDecimal.ONE);
+    void buyTest() {
+        OrderWithItemsDto orderWithItemsDto = new OrderWithItemsDto();
+        orderWithItemsDto.setTotalAmount(BigDecimal.ONE);
+        orderWithItemsDto.setItemList(new ArrayList<>());
+        Mono<OrderWithItemsDto> orderWithItemsDtoMono = Mono.just(orderWithItemsDto);
 
-        when(orderService.closeOrder()).thenReturn(orderEntity);
+        when(orderService.closeOrder()).thenReturn(orderWithItemsDtoMono);
 
-        mockMvc.perform(post("/buy"))
-                .andExpect(status().isOk())
-                .andExpect(view().name("order"))
-                .andExpect(model().attributeExists("order"))
-                .andExpect(model().attributeExists("items"));
+        webTestClient.post()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/buy")
+                        .build())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectHeader().contentType(MediaType.TEXT_HTML);
+
 
         verify(orderService, times(1)).closeOrder();
     }
 
     @Test
     @DisplayName("Проверка метода получения представления всех завершенных заказов")
-    void getAllOrdersTest() throws Exception {
+    void getAllOrdersTest() {
+        OrderWithItemsDto orderWithItemsDto = new OrderWithItemsDto();
+        orderWithItemsDto.setTotalAmount(BigDecimal.ONE);
+        orderWithItemsDto.setItemList(new ArrayList<>());
 
-        mockMvc.perform(get("/orders"))
-                .andExpect(status().isOk())
-                .andExpect(view().name("orders"))
-                .andExpect(model().attributeExists("orders"));
+        Flux<OrderWithItemsDto> orderWithItemsDtoFlux = Flux.fromIterable(List.of(orderWithItemsDto));
 
-        verify(orderService, times(1)).findOrderByStatus(OrderStatusEnum.ORDER.name());
+        when(orderService.findOrdersWithItemsByStatus(OrderStatusEnum.ORDER.name())).thenReturn(orderWithItemsDtoFlux);
+
+        webTestClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/orders")
+                        .build())
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectHeader().contentType(MediaType.TEXT_HTML);
+
+        verify(orderService, times(1)).findOrdersWithItemsByStatus(OrderStatusEnum.ORDER.name());
     }
 
     @Test
     @DisplayName("Проверка метода получения конкретного завершенного заказа")
-    void getClosedOrderTest() throws Exception {
+    void getClosedOrderTest() {
         Long id = 1L;
+        OrderWithItemsDto orderWithItemsDto = new OrderWithItemsDto();
+        orderWithItemsDto.setTotalAmount(BigDecimal.ONE);
+        orderWithItemsDto.setItemList(new ArrayList<>());
 
-        OrderEntity orderEntity = new OrderEntity();
-        orderEntity.setTotalAmount(BigDecimal.ONE);
+        Mono<OrderWithItemsDto> orderWithItemsDtoMono = Mono.just(orderWithItemsDto);
 
-        when(orderService.findById(id)).thenReturn(orderEntity);
 
-        mockMvc.perform(get("/orders/" + id))
-                .andExpect(status().isOk())
-                .andExpect(view().name("order"))
-                .andExpect(model().attributeExists("items"))
-                .andExpect(model().attributeExists("order"));
+        when(orderService.findOrdersWithItemsById(id)).thenReturn(orderWithItemsDtoMono);
 
-        verify(orderService, times(1)).findById(id);
+        webTestClient.get()
+                .uri("/orders/{id}", id)
+                .exchange()
+                .expectStatus()
+                .isOk()
+                .expectHeader().contentType(MediaType.TEXT_HTML);
+
+        verify(orderService, times(1)).findOrdersWithItemsById(id);
     }
 }

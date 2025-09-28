@@ -2,12 +2,24 @@ server:
   port: 8080
 
 spring:
-  datasource:
-    url: jdbc:postgresql://localhost:5432/postgres
+  webflux:
+     charset: UTF-8
+  thymeleaf:
+     encoding: UTF-8
+     servlet:
+       content-type: text/html;charset=UTF-8
+  r2dbc:
+    url: r2dbc:postgresql://localhost:5432/postgres
     #url: jdbc:postgresql://host.docker.internal:5432/postgres
     username: postgres
     password: postgres
-    driver-class-name: org.postgresql.Driver
+    pool:
+      enabled: true                               # Включение пула соединений
+      initial-size: 10                            # Начальное количество соединений в пуле
+      max-size: 50                                # Максимальное количество соединений
+      max-idle-time: 30s                          # Время бездействия соединения перед закрытием
+      max-life-time: 10m                          # Максимальное время жизни соединения
+      validation-query: SELECT 1
 
   flyway:
     enabled: true
