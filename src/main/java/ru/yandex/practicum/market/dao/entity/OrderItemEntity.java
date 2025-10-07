@@ -1,28 +1,26 @@
 package ru.yandex.practicum.market.dao.entity;
 
-import jakarta.persistence.*;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
+import lombok.experimental.FieldDefaults;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.relational.core.mapping.Column;
+import org.springframework.data.relational.core.mapping.Table;
 
 
-@Entity
-@Table(name = "orders_items")
+@Table("orders_items")
 @Getter
 @Setter
+@FieldDefaults(level = AccessLevel.PRIVATE)
 public class OrderItemEntity {
-
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "orders_id", nullable = false)
-    private OrderEntity order;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "items_id", nullable = false)
-    private ItemEntity item;
-
-    @Column(name = "quantity", nullable = false)
-    private Integer quantity;
+    @Column("id")
+    Long id;
+    @Column("orders_id")
+    Long orderId;
+    @Column("items_id")
+    Long itemId;
+    @Column("quantity")
+    Integer quantity;
 }

@@ -3,35 +3,35 @@ package ru.yandex.practicum.market.controller;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.autoconfigure.web.reactive.WebFluxTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.web.servlet.MockMvc;
-import ru.yandex.practicum.market.dao.entity.ItemEntity;
-import ru.yandex.practicum.market.dao.entity.OrderEntity;
-import ru.yandex.practicum.market.service.CoordinatorService;
+import org.springframework.test.web.reactive.server.WebTestClient;
+import reactor.core.publisher.Mono;
+import ru.yandex.practicum.market.dto.ItemDto;
+import ru.yandex.practicum.market.dto.OrderWithItemsDto;
 import ru.yandex.practicum.market.service.ItemService;
 import ru.yandex.practicum.market.service.OrderService;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Base64;
 import java.util.List;
 
 import static org.mockito.Mockito.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 
-@WebMvcTest(ItemController.class)
+@WebFluxTest(ItemController.class)
 @ActiveProfiles("test")
 @DisplayName("Класс для проверки взаимодействия с контроллером товаров")
 public class ItemControllerTest {
 
     @Autowired
-    MockMvc mockMvc;
+    private WebTestClient webTestClient;
 
     @MockBean
     private ItemService itemService;
@@ -39,62 +39,67 @@ public class ItemControllerTest {
     @MockBean
     private OrderService orderService;
 
-    @MockBean
-    private CoordinatorService coordinatorService;
 
     @Test
     @DisplayName("Проверка метода получения представления главной страницы")
-    void getAllItemsByConditionsTest() throws Exception {
+    void getAllItemsByConditionsTest() {
 
-        OrderEntity orderEntity = new OrderEntity();
-        ItemEntity itemEntity = new ItemEntity();
+        OrderWithItemsDto orderWithItemsDto = new OrderWithItemsDto();
+        Mono<OrderWithItemsDto> orderWithItemsDtoMono = Mono.just(orderWithItemsDto);
+        ItemDto itemDto = new ItemDto();
 
-        itemEntity.setImage("".getBytes(StandardCharsets.UTF_8));
+        itemDto.setImageBase64(Base64.getEncoder().encodeToString("".getBytes(StandardCharsets.UTF_8)));
 
         int page = 1;
         int pageSize = 10;
         String search = "Кот";
         String sort = "NO";
 
-        List<ItemEntity> itemEntityList = List.of(itemEntity);
+        List<ItemDto> itemDtoList = List.of(itemDto);
         Pageable pageable = PageRequest.of(page, pageSize);
-        Page<ItemEntity> itemEntityPage = new PageImpl<>(itemEntityList, pageable, itemEntityList.size());
+        Page<ItemDto> itemDtoPage = new PageImpl<>(itemDtoList, pageable, itemDtoList.size());
 
-        when(orderService.findCartOrder()).thenReturn(orderEntity);
-        when(itemService.getAllItemsByConditions(orderEntity, search, sort, page, pageSize)).thenReturn(itemEntityPage);
+        when(orderService.findCartOrder()).thenReturn(orderWithItemsDtoMono);
+        when(itemService.getAllItemsByConditions(orderWithItemsDtoMono, search, sort, page, pageSize)).thenReturn(Mono.just(itemDtoPage));
 
-        mockMvc.perform(get("/")
-                        .param("search", search)
-                        .param("sortBy", sort)
-                        .param("page", Integer.toString(page))
-                        .param("pageSize", Integer.toString(pageSize)))
-                .andExpect(status().isOk())
-                .andExpect(view().name("main"))
-                .andExpect(model().attributeExists("currentSize"))
-                .andExpect(model().attributeExists("currentPage"))
-                .andExpect(model().attributeExists("totalPages"))
-                .andExpect(model().attributeExists("sort"))
-                .andExpect(model().attributeExists("items"));
+        webTestClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/")
+                        .queryParam("search", search)
+                        .queryParam("sortBy", sort)
+                        .queryParam("page", Integer.toString(page))
+                        .queryParam("pageSize", Integer.toString(pageSize))
+                        .build())
+                .exchange()
+                .expectHeader().contentType(MediaType.TEXT_HTML);
 
         verify(orderService, times(1)).findCartOrder();
-        verify(itemService, times(1)).getAllItemsByConditions(orderEntity, search, sort, page, pageSize);
+        verify(itemService, times(1)).getAllItemsByConditions(orderWithItemsDtoMono, search, sort, page, pageSize);
     }
 
     @Test
     @DisplayName("Проверка метода получения представления страницы товара")
-    void getItemByIdTest() throws Exception {
+    void getItemByIdTest() {
+
+        OrderWithItemsDto orderWithItemsDto = new OrderWithItemsDto();
+        Mono<OrderWithItemsDto> orderWithItemsDtoMono = Mono.just(orderWithItemsDto);
+
         Long id = 1L;
-        ItemEntity itemEntity = new ItemEntity();
-        itemEntity.setImage("".getBytes(StandardCharsets.UTF_8));
 
-        when(coordinatorService.getItemById(id)).thenReturn(itemEntity);
+        ItemDto itemDto = new ItemDto();
+        itemDto.setImageBase64(Base64.getEncoder().encodeToString("".getBytes(StandardCharsets.UTF_8)));
 
-        mockMvc.perform(get("/item")
-                        .param("id", id.toString()))
-                .andExpect(status().isOk())
-                .andExpect(view().name("item"))
-                .andExpect(model().attributeExists("item"));
+        when(orderService.findCartOrder()).thenReturn(orderWithItemsDtoMono);
+        when(itemService.findByIdWithQuantity(orderWithItemsDtoMono, id)).thenReturn(Mono.just(itemDto));
 
-        verify(coordinatorService, times(1)).getItemById(id);
+        webTestClient.get()
+                .uri(uriBuilder -> uriBuilder
+                        .path("/item")
+                        .queryParam("id", id.toString())
+                        .build())
+                .exchange()
+                .expectHeader().contentType(MediaType.TEXT_HTML);
+
+        verify(itemService, times(1)).findByIdWithQuantity(orderWithItemsDtoMono, id);
     }
 }

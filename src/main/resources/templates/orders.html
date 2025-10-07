@@ -1,7 +1,7 @@
-<!DOCTYPE html>
-<html lang="en" xmlns:th="http://www.thymeleaf.org">
-
+<html xmlns:th="http://www.thymeleaf.org" lang="ru">
 <head>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
     <title>Заказы</title>
 </head>
 
@@ -18,8 +18,8 @@
             <a th:text="'Заказ №' + ${order.getId()}" th:href="@{'/orders/' + ${order.getId()}}"></a>
         </h2>
         <table>
-            <tr th:each="orderItem : ${order.getOrderItem()}">
-                <td th:text="${orderItem.getItem().getName()+' ('+orderItem.getQuantity()+' шт.) '+(orderItem.getItem().getPrice()*orderItem.getQuantity())+' руб.'}"></td>
+            <tr th:each="item : ${order.getItemList()}">
+                <td th:text="${item.getName()+' ('+item.getQuantity()+' шт.) '+(item.getPrice()*item.getQuantity())+' руб.'}"></td>
             </tr>
         </table>
         <p><b th:text="'Сумма: ' + ${order.getTotalAmount()} + ' руб.'"></b></p>

@@ -1,29 +1,26 @@
 package ru.yandex.practicum.market.dao.entity;
 
-import jakarta.persistence.*;
+import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.Setter;
+import lombok.experimental.FieldDefaults;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.relational.core.mapping.Column;
+import org.springframework.data.relational.core.mapping.Table;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
-import java.util.List;
 
-@Entity
-@Table(name = "orders")
+
+@Table("orders")
 @Getter
 @Setter
+@FieldDefaults(level = AccessLevel.PRIVATE)
 public class OrderEntity {
-
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
-
-    @Column(name = "status")
-    private String status;
-
-    @Column(name = "total_amount")
-    private BigDecimal totalAmount;
-
-    @OneToMany(mappedBy = "order", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<OrderItemEntity> orderItem = new ArrayList<>();
+    @Column("id")
+    Long id;
+    @Column("status")
+    String status;
+    @Column("total_amount")
+    BigDecimal totalAmount;
 }

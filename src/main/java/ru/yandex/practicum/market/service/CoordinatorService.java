@@ -3,14 +3,14 @@ package ru.yandex.practicum.market.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import reactor.core.publisher.Mono;
 import ru.yandex.practicum.market.dao.entity.ItemEntity;
 import ru.yandex.practicum.market.dao.entity.OrderEntity;
 import ru.yandex.practicum.market.dao.entity.OrderItemEntity;
+import ru.yandex.practicum.market.dto.OrderWithItemsDto;
 import ru.yandex.practicum.market.enums.ActionEnum;
 
 import java.math.BigDecimal;
-import java.util.Objects;
-import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -20,95 +20,143 @@ public class CoordinatorService {
 
     private final OrderService orderService;
 
+    private final OrderItemService orderItemService;
+
 
     @Transactional
-    public void changeItemsInOrder(Long id, String action) {
-        OrderEntity orderEntity = orderService.findCartOrder();
-        if (action.equals(ActionEnum.PLUS.name())) {
-            OrderItemEntity orderItemEntity;
-            if (orderEntity.getOrderItem().isEmpty()) {
-                orderItemEntity = initializeNewOrderItemEntity(id, orderEntity);
-                orderEntity.getOrderItem().add(orderItemEntity);
-            } else {
-                Optional<OrderItemEntity> optionalOrderItemEntity = orderEntity
-                        .getOrderItem()
-                        .stream()
-                        .filter(x -> x.getItem().getId().equals(id))
-                        .findFirst();
-                if (optionalOrderItemEntity.isPresent()) {
-                    orderItemEntity = optionalOrderItemEntity.get();
+    public Mono<Void> changeItemsInOrder(Long id, String action) {
+        Mono<OrderWithItemsDto> orderWithItemsDtoMono = orderService.findCartOrder();
+        ActionEnum actionEnum = ActionEnum.valueOf(action);
+        switch (actionEnum) {
+            case PLUS -> {
+                return addItemToOrder(id, orderWithItemsDtoMono);
+            }
+            case MINUS -> {
+                return decreaseItemQuantity(id, orderWithItemsDtoMono);
+            }
+            case DELETE -> {
+                return removeItemFromOrder(id, orderWithItemsDtoMono);
+            }
+        }
+        return Mono.empty();
+    }
+
+
+    private Mono<Void> addItemToOrder(Long id, Mono<OrderWithItemsDto> orderWithItemsDtoMono) {
+        return orderWithItemsDtoMono
+                .flatMap(orderWithItemsDto -> {
+                    if (orderWithItemsDto.getItemList().isEmpty() ||
+                            orderWithItemsDto.getItemList().stream().noneMatch(item -> item.getId().equals(id))) {
+                        return initializeNewOrderItemEntity(orderWithItemsDto, id);
+                    } else {
+                        return increaseOrderItemQuantity(orderWithItemsDto, id);
+                    }
+                });
+    }
+
+
+    private Mono<Void> decreaseItemQuantity(Long id, Mono<OrderWithItemsDto> orderWithItemsDtoMono) {
+        return orderWithItemsDtoMono
+                .flatMap(orderWithItemsDto -> {
+                    Mono<ItemEntity> itemEntityMono = itemService.findById(id);
+                    Mono<OrderItemEntity> orderItemEntityMono = orderItemService.findByOrderIdAndItemId(orderWithItemsDto.getId(), id);
+                    return Mono.zip(itemEntityMono, orderItemEntityMono)
+                            .flatMap(tuple -> {
+                                ItemEntity itemEntity = tuple.getT1();
+                                OrderItemEntity orderItemEntity = tuple.getT2();
+                                if (orderItemEntity.getQuantity() > 0) {
+                                    BigDecimal newTotalAmount = orderWithItemsDto.getTotalAmount().subtract(itemEntity.getPrice());
+
+                                    OrderEntity orderEntity = new OrderEntity();
+                                    orderEntity.setId(orderWithItemsDto.getId());
+                                    orderEntity.setStatus(orderWithItemsDto.getStatus());
+                                    orderEntity.setTotalAmount(newTotalAmount);
+
+                                    orderItemEntity.setQuantity(orderItemEntity.getQuantity() - 1);
+
+                                    return orderService.save(orderEntity)
+                                            .then(orderItemService.save(orderItemEntity))
+                                            .then();
+                                } else {
+                                    return deleteOrderItemEntity(orderItemEntity, itemEntity, orderWithItemsDto);
+                                }
+                            });
+                });
+
+    }
+
+
+    private Mono<Void> removeItemFromOrder(Long id, Mono<OrderWithItemsDto> orderWithItemsDtoMono) {
+        return orderWithItemsDtoMono
+                .flatMap(orderWithItemsDto -> {
+                    Mono<ItemEntity> itemEntityMono = itemService.findById(id);
+                    Mono<OrderItemEntity> orderItemEntityMono = orderItemService.findByOrderIdAndItemId(orderWithItemsDto.getId(), id);
+                    return Mono.zip(itemEntityMono, orderItemEntityMono)
+                            .flatMap(tuple -> {
+                                ItemEntity itemEntity = tuple.getT1();
+                                OrderItemEntity orderItemEntity = tuple.getT2();
+                                return deleteOrderItemEntity(orderItemEntity, itemEntity, orderWithItemsDto);
+                            });
+                });
+    }
+
+    private Mono<Void> initializeNewOrderItemEntity(OrderWithItemsDto orderWithItemsDto, Long itemId) {
+        Mono<ItemEntity> itemEntityMono = itemService.findById(itemId);
+
+        return itemEntityMono.flatMap(itemEntity -> {
+            BigDecimal newTotalAmount = orderWithItemsDto.getTotalAmount().add(itemEntity.getPrice());
+
+            OrderEntity orderEntity = new OrderEntity();
+            orderEntity.setId(orderWithItemsDto.getId());
+            orderEntity.setStatus(orderWithItemsDto.getStatus());
+            orderEntity.setTotalAmount(newTotalAmount);
+
+            OrderItemEntity orderItemEntity = new OrderItemEntity();
+            orderItemEntity.setItemId(itemId);
+            orderItemEntity.setOrderId(orderWithItemsDto.getId());
+            orderItemEntity.setQuantity(1);
+
+            return orderService.save(orderEntity)
+                    .then(orderItemService.save(orderItemEntity))
+                    .then();
+        });
+    }
+
+    private Mono<Void> increaseOrderItemQuantity(OrderWithItemsDto orderWithItemsDto, Long itemId) {
+        Mono<ItemEntity> itemEntityMono = itemService.findById(itemId);
+        Mono<OrderItemEntity> orderItemEntityMono = orderItemService.findByOrderIdAndItemId(orderWithItemsDto.getId(), itemId);
+        return Mono.zip(itemEntityMono, orderItemEntityMono)
+                .flatMap(tuple -> {
+                    ItemEntity itemEntity = tuple.getT1();
+                    OrderItemEntity orderItemEntity = tuple.getT2();
+
+                    BigDecimal newTotalAmount = orderWithItemsDto.getTotalAmount().add(itemEntity.getPrice());
+
+                    OrderEntity orderEntity = new OrderEntity();
+                    orderEntity.setId(orderWithItemsDto.getId());
+                    orderEntity.setStatus(orderWithItemsDto.getStatus());
+                    orderEntity.setTotalAmount(newTotalAmount);
+
                     orderItemEntity.setQuantity(orderItemEntity.getQuantity() + 1);
-                    orderEntity.setTotalAmount(orderEntity.getTotalAmount().add(orderItemEntity.getItem().getPrice()));
-                } else {
-                    orderItemEntity = initializeNewOrderItemEntity(id, orderEntity);
-                    orderEntity.getOrderItem().add(orderItemEntity);
-                }
-            }
-            orderService.save(orderEntity);
-        } else if (action.equals(ActionEnum.MINUS.name())) {
-            decreaseQuantity(id, orderEntity);
-        } else {
-            Optional<OrderItemEntity> optionalOrderItemEntity = orderEntity
-                    .getOrderItem()
-                    .stream()
-                    .filter(x -> x.getItem().getId().equals(id) &&
-                            x.getOrder().getId().equals(orderEntity.getId()))
-                    .findFirst();
-            deleteOrderItemEntity(orderEntity, optionalOrderItemEntity.get());
-        }
+
+                    return orderService.save(orderEntity)
+                            .then(orderItemService.save(orderItemEntity))
+                            .then();
+                });
     }
 
-    public ItemEntity getItemById(Long id) {
-        ItemEntity itemEntity = itemService.findById(id);
-        OrderEntity orderEntity = orderService.findCartOrder();
-        Optional<OrderItemEntity> orderItemEntity = itemEntity.getOrderItems().stream()
-                .filter(x -> Objects.equals(x.getOrder().getId(), orderEntity.getId()))
-                .findFirst();
-        if (orderItemEntity.isPresent()) {
-            itemEntity.setQuantity(orderItemEntity.get().getQuantity());
-        } else {
-            itemEntity.setQuantity(0);
-        }
-        return itemEntity;
-    }
+    private Mono<Void> deleteOrderItemEntity(OrderItemEntity orderItemEntity, ItemEntity itemEntity, OrderWithItemsDto orderWithItemsDto) {
+        BigDecimal newTotalAmount = orderWithItemsDto.getTotalAmount()
+                .subtract(itemEntity.getPrice()
+                        .multiply(BigDecimal.valueOf(orderItemEntity.getQuantity())));
 
-    private OrderItemEntity initializeNewOrderItemEntity(Long id, OrderEntity orderEntity) {
-        OrderItemEntity orderItemEntity;
-        ItemEntity itemEntity = itemService.findById(id);
-        orderEntity.setTotalAmount(orderEntity.getTotalAmount().add(itemEntity.getPrice()));
+        OrderEntity orderEntity = new OrderEntity();
+        orderEntity.setId(orderWithItemsDto.getId());
+        orderEntity.setStatus(orderWithItemsDto.getStatus());
+        orderEntity.setTotalAmount(newTotalAmount);
 
-        orderItemEntity = new OrderItemEntity();
-        orderItemEntity.setOrder(orderEntity);
-        orderItemEntity.setItem(itemEntity);
-        orderItemEntity.setQuantity(1);
-        return orderItemEntity;
-    }
-
-    private void deleteOrderItemEntity(OrderEntity orderEntity, OrderItemEntity orderItemEntity) {
-        BigDecimal decreaseAmount = orderItemEntity.getItem().getPrice()
-                .multiply(BigDecimal.valueOf(orderItemEntity.getQuantity()));
-        orderEntity.setTotalAmount(orderEntity.getTotalAmount().subtract(decreaseAmount));
-        orderEntity.getOrderItem().remove(orderItemEntity);
-        orderService.save(orderEntity);
-    }
-
-    private void decreaseQuantity(Long id, OrderEntity orderEntity) {
-        Optional<OrderItemEntity> optionalOrderItemEntity = orderEntity
-                .getOrderItem()
-                .stream()
-                .filter(x -> x.getItem().getId().equals(id) &&
-                        x.getOrder().getId().equals(orderEntity.getId()))
-                .findFirst();
-        if (optionalOrderItemEntity.isPresent()) {
-            OrderItemEntity orderItemEntity = optionalOrderItemEntity.get();
-            int newQuantity = orderItemEntity.getQuantity() - 1;
-            if (newQuantity > 0) {
-                orderItemEntity.setQuantity(newQuantity);
-                orderEntity.setTotalAmount(orderEntity.getTotalAmount().subtract(orderItemEntity.getItem().getPrice()));
-                orderService.save(orderEntity);
-            } else {
-                deleteOrderItemEntity(orderEntity, orderItemEntity);
-            }
-        }
+        return orderService.save(orderEntity)
+                .then(orderItemService.delete(orderItemEntity))
+                .then();
     }
 }

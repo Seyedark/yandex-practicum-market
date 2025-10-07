@@ -6,14 +6,11 @@ import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestParam;
-import ru.yandex.practicum.market.dao.entity.ItemEntity;
-import ru.yandex.practicum.market.dao.entity.OrderEntity;
+import org.springframework.web.server.ServerWebExchange;
+import reactor.core.publisher.Mono;
 import ru.yandex.practicum.market.enums.OrderStatusEnum;
 import ru.yandex.practicum.market.service.CoordinatorService;
 import ru.yandex.practicum.market.service.OrderService;
-
-import java.util.List;
 
 @Controller
 @RequiredArgsConstructor
@@ -23,64 +20,63 @@ public class OrderController {
     private final CoordinatorService coordinatorService;
 
     @GetMapping("/cart")
-    public String getCart(Model model) {
-        OrderEntity orderEntity = orderService.findCartOrder();
-
-        List<ItemEntity> entityList = extractItemsFromOrder(orderEntity);
-        model.addAttribute("items", extractItemsFromOrder(orderEntity));
-        model.addAttribute("total", orderEntity.getTotalAmount());
-        model.addAttribute("empty", entityList.isEmpty());
-        return "cart";
+    public Mono<String> getCart(Model model) {
+        return orderService.findCartOrder()
+                .map(orderWithItemsDto -> {
+                    model.addAttribute("items", orderWithItemsDto.getItemList());
+                    model.addAttribute("total", orderWithItemsDto.getTotalAmount());
+                    model.addAttribute("empty", orderWithItemsDto.getItemList().isEmpty());
+                    return "cart";
+                });
     }
 
     @PostMapping("/cart/items/{id}")
-    public String changeItemsInOrder(@PathVariable("id") Long id,
-                                     @RequestParam("action") String action,
-                                     @RequestParam("form") String form) {
-        coordinatorService.changeItemsInOrder(id, action);
-        if (form.equals("main")) {
-            return "redirect:/";
-        } else if (form.equals("cart")) {
-            return "redirect:/" + form;
-        } else {
-            return "redirect:/" + form + "?id=" + id;
-        }
+    public Mono<String> changeItemsInOrder(@PathVariable("id") Long id,
+                                           ServerWebExchange exchange) {
+        return exchange.getFormData()
+                .flatMap(formData -> {
+                    String action = formData.getFirst("action");
+                    String form = formData.getFirst("form");
+                    return coordinatorService.changeItemsInOrder(id, action)
+                            .then(Mono.fromSupplier(() -> {
+                                if ("main".equals(form)) {
+                                    return "redirect:/";
+                                } else if ("cart".equals(form)) {
+                                    return "redirect:/" + form;
+                                } else {
+                                    return "redirect:/" + form + "?id=" + id;
+                                }
+                            }));
+                });
     }
 
     @PostMapping("/buy")
-    public String buy(Model model) {
-        OrderEntity orderEntity = orderService.closeOrder();
-
-        model.addAttribute("order", orderEntity);
-        model.addAttribute("items", extractItemsFromOrder(orderEntity));
-        return "order";
+    public Mono<String> buy(Model model) {
+        return orderService.closeOrder()
+                .map(orderWithItemsDto -> {
+                    model.addAttribute("items", orderWithItemsDto.getItemList());
+                    model.addAttribute("order", orderWithItemsDto);
+                    return "order";
+                });
     }
 
     @GetMapping("/orders")
-    public String getAllOrders(Model model) {
-        List<OrderEntity> orderEntityList = orderService.findOrderByStatus(OrderStatusEnum.ORDER.name());
-        model.addAttribute("orders", orderEntityList);
-        return "orders";
+    public Mono<String> getAllOrders(Model model) {
+        return orderService.findOrdersWithItemsByStatus(OrderStatusEnum.ORDER.name())
+                .collectList()
+                .map(orderWithItemsDtoList -> {
+                    model.addAttribute("orders", orderWithItemsDtoList);
+                    return "orders";
+                });
     }
 
     @GetMapping("/orders/{id}")
-    public String getClosedOrder(@PathVariable("id") Long id,
-                                 Model model) {
-        OrderEntity orderEntity = orderService.findById(id);
-
-        model.addAttribute("order", orderEntity);
-        model.addAttribute("items", extractItemsFromOrder(orderEntity));
-        return "order";
-    }
-
-    private List<ItemEntity> extractItemsFromOrder(OrderEntity orderEntity) {
-        return orderEntity.getOrderItem()
-                .stream()
-                .map(orderItem -> {
-                    ItemEntity item = orderItem.getItem();
-                    item.setQuantity(orderItem.getQuantity());
-                    return item;
-                })
-                .toList();
+    public Mono<String> getClosedOrder(@PathVariable("id") Long id,
+                                       Model model) {
+        return orderService.findOrdersWithItemsById(id)
+                .map(orderWithItemsDto -> {
+                    model.addAttribute("order", orderWithItemsDto);
+                    return "order";
+                });
     }
 }
