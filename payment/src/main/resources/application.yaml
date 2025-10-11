@@ -1,0 +1,5 @@
+server:
+  port: 8081
+
+app:
+  amount: 1234.56
