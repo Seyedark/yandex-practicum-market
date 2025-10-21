@@ -1,0 +1,96 @@
+openapi: 3.0.0
+info:
+  title: Payment API
+  version: 1.0.0
+  description: API сервиса платежей
+  contact:
+    name: Payment Support team
+    email: payment-support-test@payment-support-test.com
+servers:
+  - url: http://localhost:8081
+    description: Основной сервер
+
+tags:
+  - name: Balance
+    description: Операции со счётом
+
+paths:
+  /balance:
+    get:
+      summary: Проверка баланса
+      tags:
+        - Balance
+      description: Операция возвращает текущий баланс
+      operationId: getBalance
+      parameters:
+        - $ref: '#/components/parameters/PurchaseAmount'
+      responses:
+        '200':
+          description: Успешный ответ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Balance'
+        '400':
+          description: Баланс меньше суммы покупки
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Balance'
+
+  /balance/withdraw:
+    put:
+      summary: Списание баланса
+      tags:
+        - Balance
+      description: Операция списания средств с баланса
+      operationId: withdrawBalance
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                amount:
+                  type: number
+                  format: double
+                  description: Сумма списания
+              required:
+                - amount
+      responses:
+        '200':
+          description: Успешное списание баланса
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Balance'
+        '400':
+          description: Ошибка при списании (недостаточно средств)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Balance'
+
+
+components:
+  parameters:
+    PurchaseAmount:
+      name: purchaseAmount
+      in: query
+      description: Сумма покупки
+      required: true
+      schema:
+        type: number
+        format: double
+
+  schemas:
+    Balance:
+      type: object
+      properties:
+        amount:
+          type: number
+          format: double
+          description: Текущий счёта
+      required:
+        - amount
