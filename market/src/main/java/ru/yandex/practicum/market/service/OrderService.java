@@ -2,11 +2,11 @@ package ru.yandex.practicum.market.service;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.r2dbc.core.R2dbcEntityTemplate;
+import org.springframework.r2dbc.core.DatabaseClient;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
-import ru.yandex.practicum.market.api.BalanceApi;
 import ru.yandex.practicum.market.dao.entity.OrderEntity;
 import ru.yandex.practicum.market.dao.repository.OrderRepository;
 import ru.yandex.practicum.market.dto.ItemCacheDto;
@@ -27,22 +27,22 @@ import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
-public class OrderService extends BalanceApi {
+public class OrderService {
     private final OrderRepository orderRepository;
     private final R2dbcEntityTemplate entityTemplate;
     private final PaymentApiService paymentApiService;
     private final RedisCacheService redisCacheService;
 
     @Transactional
-    public Mono<OrderWithItemsAndResponseDto> findCartOrderAndCheck() {
-        return findOrdersWithItemsByStatus(OrderStatusEnum.CART.name(), false)
+    public Mono<OrderWithItemsAndResponseDto> findCartOrderAndCheck(Long userId) {
+        return findOrdersWithItemsByStatus(OrderStatusEnum.CART.name(), false, userId)
                 .next()
                 .flatMap(order -> {
                     if (!order.getItemList().isEmpty()) {
                         return Mono.zip(
                                 Mono.just(order),
                                 redisCacheService.getAllItems().collectList(),
-                                paymentApiService.formBalanceResponse(order.getTotalAmount(), true)
+                                paymentApiService.formBalanceResponse(order.getTotalAmount(), userId, true)
                         ).map(tuple -> {
                             OrderWithItemsAndResponseDto dto = new OrderWithItemsAndResponseDto();
                             enrichOrderWithItemsByCashedItems(tuple.getT1(), tuple.getT2());
@@ -51,14 +51,18 @@ public class OrderService extends BalanceApi {
                             return dto;
                         });
                     } else {
-                        return createNewCartOrder().map(newOrder -> {
+                        OrderWithItemsAndResponseDto dto = new OrderWithItemsAndResponseDto();
+                        dto.setOrderWithItemsDto(order);
+                        return Mono.just(dto);
+                    }
+                }).switchIfEmpty(createNewCartOrder(userId)
+                        .map(newOrder -> {
                             OrderWithItemsAndResponseDto dto = new OrderWithItemsAndResponseDto();
                             dto.setOrderWithItemsDto(newOrder);
                             dto.setBalanceApiResponseDto(null);
                             return dto;
-                        });
-                    }
-                });
+                        })
+                );
     }
 
 
@@ -78,18 +82,18 @@ public class OrderService extends BalanceApi {
     }
 
     @Transactional
-    public Mono<OrderWithItemsDto> findCartOrder(boolean withFullItems) {
-        return findOrdersWithItemsByStatus(OrderStatusEnum.CART.name(), withFullItems).next()
-                .switchIfEmpty(createNewCartOrder());
+    public Mono<OrderWithItemsDto> findCartOrder(Long userId, boolean withFullItems) {
+        return findOrdersWithItemsByStatus(OrderStatusEnum.CART.name(), withFullItems, userId).next()
+                .switchIfEmpty(createNewCartOrder(userId));
     }
 
 
     @Transactional
-    public Mono<OrderWithItemsAndResponseDto> closeOrder() {
-        return findOrdersWithItemsByStatus(OrderStatusEnum.CART.name(), true)
+    public Mono<OrderWithItemsAndResponseDto> closeOrder(Long userId) {
+        return findOrdersWithItemsByStatus(OrderStatusEnum.CART.name(), true, userId)
                 .next()
                 .flatMap(orderWithItemsDto -> paymentApiService
-                        .formBalanceResponse(orderWithItemsDto.getTotalAmount(), false)
+                        .formBalanceResponse(orderWithItemsDto.getTotalAmount(), userId, false)
                         .flatMap(balanceApiResponseDto -> {
                             OrderWithItemsAndResponseDto orderWithItemsAndResponseDto = new OrderWithItemsAndResponseDto();
                             if (!balanceApiResponseDto.getCode().equals(BalanceApiEnum.SUCCESS.getCode())) {
@@ -99,6 +103,7 @@ public class OrderService extends BalanceApi {
                                 OrderEntity orderEntity = new OrderEntity();
                                 orderEntity.setId(orderWithItemsDto.getId());
                                 orderEntity.setStatus(OrderStatusEnum.ORDER.name());
+                                orderEntity.setUserId(userId == -1 ? null : userId);
                                 orderEntity.setTotalAmount(orderWithItemsDto.getTotalAmount());
                                 return save(orderEntity)
                                         .map(saved -> {
@@ -111,29 +116,37 @@ public class OrderService extends BalanceApi {
     }
 
 
-    public Flux<OrderWithItemsDto> findOrdersWithItemsByStatus(String status, boolean withFullItems) {
+    public Flux<OrderWithItemsDto> findOrdersWithItemsByStatus(String status, boolean withFullItems, Long userId) {
         String sql;
         if (withFullItems) {
             sql = """
-                    SELECT o.id, o.status, o.total_amount,
+                    SELECT o.id, o.user_id, o.status, o.total_amount,
                            oi.quantity, oi.items_id as item_id, i.name, i.description, i.price, i.image
                     FROM orders o
                     LEFT JOIN orders_items oi ON o.id = oi.orders_id
                     LEFT JOIN items i ON oi.items_id = i.id
                     WHERE o.status = :status
+                    AND (:userId IS NULL AND o.user_id IS NULL OR o.user_id = :userId)
                     """;
         } else {
             sql = """
-                    SELECT o.id, o.status, o.total_amount,
+                    SELECT o.id, o.user_id, o.status, o.total_amount,
                            oi.quantity, oi.items_id as item_id
                     FROM orders o
                     LEFT JOIN orders_items oi ON o.id = oi.orders_id
                     WHERE o.status = :status
+                    AND (:userId IS NULL AND o.user_id IS NULL OR o.user_id = :userId)
                     """;
         }
-        return entityTemplate.getDatabaseClient().sql(sql)
-                .bind("status", status)
-                .fetch()
+        DatabaseClient.GenericExecuteSpec spec = entityTemplate.getDatabaseClient().sql(sql)
+                .bind("status", status);
+
+        if (userId == -1) {
+            spec = spec.bindNull("userId", Long.class);
+        } else {
+            spec = spec.bind("userId", userId);
+        }
+        return spec.fetch()
                 .all()
                 .collectMultimap(row -> row.get("id"))
                 .flatMapMany(orderMap -> Flux.fromIterable(orderMap.entrySet()))
@@ -145,6 +158,7 @@ public class OrderService extends BalanceApi {
                     order.setId((Long) firstRow.get("id"));
                     order.setStatus((String) firstRow.get("status"));
                     order.setTotalAmount((BigDecimal) firstRow.get("total_amount"));
+                    order.setUserId((Long) firstRow.get("user_id"));
                     List<ItemDto> items = rows.stream()
                             .filter(row -> row.get("item_id") != null)
                             .map(row -> {
@@ -218,10 +232,11 @@ public class OrderService extends BalanceApi {
     }
 
 
-    private Mono<OrderWithItemsDto> createNewCartOrder() {
+    private Mono<OrderWithItemsDto> createNewCartOrder(Long userId) {
         OrderEntity orderEntity = new OrderEntity();
         orderEntity.setStatus(OrderStatusEnum.CART.name());
         orderEntity.setTotalAmount(BigDecimal.ZERO);
+        orderEntity.setUserId(userId == -1 ? null : userId);
         return orderRepository.save(orderEntity)
                 .flatMap(x -> {
                     OrderWithItemsDto orderWithItemsDto = new OrderWithItemsDto();

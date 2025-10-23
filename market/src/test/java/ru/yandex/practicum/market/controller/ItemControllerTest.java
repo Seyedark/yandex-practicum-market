@@ -3,15 +3,16 @@ package ru.yandex.practicum.market.controller;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.reactive.WebFluxTest;
+import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
+import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import reactor.core.publisher.Mono;
 import ru.yandex.practicum.market.dto.ItemDto;
 import ru.yandex.practicum.market.dto.OrderWithItemsDto;
 import ru.yandex.practicum.market.dto.PageResponseDto;
+import ru.yandex.practicum.market.service.CustomUserDetailsService;
 import ru.yandex.practicum.market.service.ItemService;
 import ru.yandex.practicum.market.service.OrderService;
 
@@ -22,8 +23,8 @@ import java.util.List;
 import static org.mockito.Mockito.*;
 
 
-@WebFluxTest(ItemController.class)
-@ActiveProfiles("test")
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@AutoConfigureWebTestClient
 @DisplayName("Класс для проверки взаимодействия с контроллером товаров")
 public class ItemControllerTest {
     @Autowired
@@ -32,11 +33,12 @@ public class ItemControllerTest {
     private ItemService itemService;
     @MockBean
     private OrderService orderService;
-
+    @MockBean
+    private CustomUserDetailsService customUserDetailsService;
 
     @Test
-    @DisplayName("Проверка метода получения представления главной страницы")
-    void getAllItemsByConditionsTest() {
+    @DisplayName("Проверка метода получения представления главной страницы с авторизацией")
+    void getAllItemsByConditionsSuccessTest() {
 
         OrderWithItemsDto orderWithItemsDto = new OrderWithItemsDto();
         Mono<OrderWithItemsDto> orderWithItemsDtoMono = Mono.just(orderWithItemsDto);
@@ -56,10 +58,13 @@ public class ItemControllerTest {
         pageResponseDto.setTotalPages(pageSize);
         Mono<PageResponseDto> pageResponseDtoMono = Mono.just(pageResponseDto);
 
-        when(orderService.findCartOrder(false)).thenReturn(orderWithItemsDtoMono);
+
+        when(customUserDetailsService.getUserIdFromPrincipal(any())).thenReturn(Mono.just(1L));
+        when(orderService.findCartOrder(1L, false)).thenReturn(orderWithItemsDtoMono);
         when(itemService.getAllItemsByConditions(orderWithItemsDtoMono, search, sort, page, pageSize)).thenReturn(pageResponseDtoMono);
 
-        webTestClient.get()
+        webTestClient
+                .get()
                 .uri(uriBuilder -> uriBuilder
                         .path("/")
                         .queryParam("search", search)
@@ -68,15 +73,18 @@ public class ItemControllerTest {
                         .queryParam("pageSize", Integer.toString(pageSize))
                         .build())
                 .exchange()
+                .expectStatus().isOk()
                 .expectHeader().contentType(MediaType.TEXT_HTML);
 
-        verify(orderService, times(1)).findCartOrder(false);
+        verify(customUserDetailsService, times(1)).getUserIdFromPrincipal(any());
+        verify(orderService, times(1)).findCartOrder(1L, false);
         verify(itemService, times(1)).getAllItemsByConditions(orderWithItemsDtoMono, search, sort, page, pageSize);
     }
 
+
     @Test
-    @DisplayName("Проверка метода получения представления страницы товара")
-    void getItemByIdTest() {
+    @DisplayName("Проверка метода получения представления страницы товара с авторизацией")
+    void getItemBySuccessIdTest() {
 
         OrderWithItemsDto orderWithItemsDto = new OrderWithItemsDto();
         Mono<OrderWithItemsDto> orderWithItemsDtoMono = Mono.just(orderWithItemsDto);
@@ -86,7 +94,8 @@ public class ItemControllerTest {
         ItemDto itemDto = new ItemDto();
         itemDto.setImageBase64(Base64.getEncoder().encodeToString("".getBytes(StandardCharsets.UTF_8)));
 
-        when(orderService.findCartOrder(false)).thenReturn(orderWithItemsDtoMono);
+        when(customUserDetailsService.getUserIdFromPrincipal(any())).thenReturn(Mono.just(1L));
+        when(orderService.findCartOrder(1L, false)).thenReturn(orderWithItemsDtoMono);
         when(itemService.findByIdWithQuantity(orderWithItemsDtoMono, id)).thenReturn(Mono.just(itemDto));
 
         webTestClient.get()

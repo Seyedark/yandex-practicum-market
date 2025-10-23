@@ -8,21 +8,16 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.relational.core.mapping.Column;
 import org.springframework.data.relational.core.mapping.Table;
 
-import java.math.BigDecimal;
-
-
-@Table("orders")
+@Table("users")
 @Getter
 @Setter
 @FieldDefaults(level = AccessLevel.PRIVATE)
-public class OrderEntity {
+public class UserEntity {
     @Id
     @Column("id")
     Long id;
-    @Column("status")
-    String status;
-    @Column("total_amount")
-    BigDecimal totalAmount;
-    @Column("user_id")
-    Long userId;
+    @Column("user_name")
+    String userName;
+    @Column("password")
+    String password;
 }
