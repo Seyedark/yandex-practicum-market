@@ -4,9 +4,12 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
+import org.springframework.boot.test.autoconfigure.web.reactive.WebFluxTest;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
+import org.springframework.security.test.context.support.WithMockUser;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import reactor.core.publisher.Mono;
 import ru.yandex.practicum.market.dto.ItemDto;
@@ -22,9 +25,8 @@ import java.util.List;
 
 import static org.mockito.Mockito.*;
 
-
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@AutoConfigureWebTestClient
+@WebFluxTest(ItemController.class)
+@ActiveProfiles("test")
 @DisplayName("Класс для проверки взаимодействия с контроллером товаров")
 public class ItemControllerTest {
     @Autowired
@@ -37,6 +39,7 @@ public class ItemControllerTest {
     private CustomUserDetailsService customUserDetailsService;
 
     @Test
+    @WithMockUser
     @DisplayName("Проверка метода получения представления главной страницы с авторизацией")
     void getAllItemsByConditionsSuccessTest() {
 
@@ -83,6 +86,7 @@ public class ItemControllerTest {
 
 
     @Test
+    @WithMockUser
     @DisplayName("Проверка метода получения представления страницы товара с авторизацией")
     void getItemBySuccessIdTest() {
 

@@ -4,11 +4,14 @@ import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.reactive.AutoConfigureWebTestClient;
+import org.springframework.boot.test.autoconfigure.web.reactive.WebFluxTest;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.security.test.web.reactive.server.SecurityMockServerConfigurers;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.reactive.server.WebTestClient;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
@@ -31,8 +34,8 @@ import java.util.List;
 
 import static org.mockito.Mockito.*;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@AutoConfigureWebTestClient
+@WebFluxTest(OrderController.class)
+@ActiveProfiles("test")
 @DisplayName("Класс для проверки взаимодействия с контроллером заказов")
 public class OrderControllerTest {
     @Autowired
@@ -45,6 +48,7 @@ public class OrderControllerTest {
     private CustomUserDetailsService customUserDetailsService;
 
     @Test
+    @WithMockUser
     @DisplayName("Проверка метода получения представления корзины c переданным пользователем")
     void getCartSuccessTest() {
 
@@ -98,6 +102,7 @@ public class OrderControllerTest {
     }
 
     @Test
+    @WithMockUser
     @DisplayName("Проверка метода изменения кол-ва товара в заказе c переданным пользователем и редиректа на главную страницу")
     void changeItemsInOrderSuccessTest() {
         Long id = 1L;
@@ -146,6 +151,7 @@ public class OrderControllerTest {
     }
 
     @Test
+    @WithMockUser
     @DisplayName("Проверка метода изменения кол-ва товара в заказе без csrf токена")
     void changeItemsInOrderFailCsrfTest() {
         Long id = 1L;
@@ -158,6 +164,7 @@ public class OrderControllerTest {
     }
 
     @Test
+    @WithMockUser
     @DisplayName("Проверка метода получения представления завершенного пустого")
     void buyWithRedirectTest() {
         BalanceApiResponseDto balanceApiResponseDto = new BalanceApiResponseDto();
@@ -190,6 +197,7 @@ public class OrderControllerTest {
     }
 
     @Test
+    @WithMockUser
     @DisplayName("Проверка метода получения представления завершенного заказа")
     void buyTest() {
         OrderWithItemsDto orderWithItemsDto = new OrderWithItemsDto();
@@ -266,6 +274,7 @@ public class OrderControllerTest {
 
 
     @Test
+    @WithMockUser
     @DisplayName("Проверка метода получения представления всех завершенных заказов")
     void getAllOrdersTest() {
         OrderWithItemsDto orderWithItemsDto = new OrderWithItemsDto();
@@ -310,6 +319,7 @@ public class OrderControllerTest {
     }
 
     @Test
+    @WithMockUser
     @DisplayName("Проверка метода получения конкретного завершенного заказа с пользователем")
     void getClosedOrderTest() {
         Long id = 1L;

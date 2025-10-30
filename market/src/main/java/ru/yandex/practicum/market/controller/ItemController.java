@@ -28,7 +28,6 @@ public class ItemController {
                                                 @RequestParam(name = "pageSize", defaultValue = "10") long pageSize,
                                                 @AuthenticationPrincipal Mono<CustomUserDetails> principal,
                                                 Model model) {
-        System.out.println(principal);
         Mono<PageResponseDto> pageResponseDtoMono = customUserDetailsService
                 .getUserIdFromPrincipal(principal)
                 .flatMap(userId -> itemService.getAllItemsByConditions(orderService.findCartOrder(userId, false), search, sort, page, pageSize));

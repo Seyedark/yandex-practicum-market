@@ -32,7 +32,6 @@ public class PaymentApiService {
                 .map(OAuth2AuthorizedClient::getAccessToken)
                 .map(OAuth2AccessToken::getTokenValue)
                 .flatMap(accessToken -> {
-                    System.out.println(accessToken);
                     balanceApi.getApiClient().addDefaultHeader("Authorization", "Bearer " + accessToken);
                     if (check) {
                         return balanceApi
