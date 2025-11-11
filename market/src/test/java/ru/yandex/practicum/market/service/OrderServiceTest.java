@@ -51,8 +51,9 @@ public class OrderServiceTest extends SpringBootPostgreSQLBase {
     @Test
     @DisplayName("Вернёт заказ со статусом корзина и проверит вызовет сервисы платежей и редис")
     void findCartOrderAndCheckTest() {
-        Long orderId = 1L;
+        Long userId = 1L;
         OrderEntity orderEntity = new OrderEntity();
+        orderEntity.setUserId(userId);
         orderEntity.setStatus(OrderStatusEnum.CART.name());
 
         OrderEntity savedOrder = orderRepository.save(orderEntity).block();
@@ -71,10 +72,10 @@ public class OrderServiceTest extends SpringBootPostgreSQLBase {
         itemCacheDto.setId(1L);
         itemCacheDto.setPrice(BigDecimal.TEN);
         Flux<ItemCacheDto> itemCacheDtoFlux = Flux.just(itemCacheDto);
-        when(paymentApiService.formBalanceResponse(any(), eq(true))).thenReturn(balanceApiResponseDtoMono);
+        when(paymentApiService.formBalanceResponse(any(), eq(userId), eq(true))).thenReturn(balanceApiResponseDtoMono);
         when(redisCacheService.getAllItems()).thenReturn(itemCacheDtoFlux);
 
-        Mono<OrderWithItemsAndResponseDto> orderWithItemsAndResponseDtoMono = service.findCartOrderAndCheck();
+        Mono<OrderWithItemsAndResponseDto> orderWithItemsAndResponseDtoMono = service.findCartOrderAndCheck(userId);
         OrderWithItemsAndResponseDto orderWithItemsAndResponseDto = orderWithItemsAndResponseDtoMono.block();
 
         assertEquals(OrderStatusEnum.CART.name(), orderWithItemsAndResponseDto.getOrderWithItemsDto().getStatus());
@@ -85,8 +86,9 @@ public class OrderServiceTest extends SpringBootPostgreSQLBase {
     @Test
     @DisplayName("Вернёт заказ со статусом корзина")
     void findCartOrderTest() {
-        Mono<OrderWithItemsDto> orderWithItemsDtoMonoFirst = service.findCartOrder(true);
-        Mono<OrderWithItemsDto> orderWithItemsDtoMonoSecond = service.findCartOrder(true);
+        Long userId = 1L;
+        Mono<OrderWithItemsDto> orderWithItemsDtoMonoFirst = service.findCartOrder(userId, true);
+        Mono<OrderWithItemsDto> orderWithItemsDtoMonoSecond = service.findCartOrder(userId, true);
         OrderWithItemsDto first = orderWithItemsDtoMonoFirst.block();
         OrderWithItemsDto second = orderWithItemsDtoMonoSecond.block();
         assertEquals(OrderStatusEnum.CART.name(), first.getStatus());
@@ -127,13 +129,15 @@ public class OrderServiceTest extends SpringBootPostgreSQLBase {
     @Test
     @DisplayName("Поиск списка заказов по статусу")
     void findByStatusTest() {
+        Long userId = 1L;
         OrderEntity orderEntity = new OrderEntity();
         orderEntity.setStatus(OrderStatusEnum.CART.name());
         orderEntity.setTotalAmount(BigDecimal.valueOf(105).setScale(2, RoundingMode.HALF_UP));
+        orderEntity.setUserId(userId);
         Mono<OrderEntity> expectedMono = service.save(orderEntity);
         OrderEntity expected = expectedMono.block();
 
-        Flux<OrderWithItemsDto> orderEntityList = service.findOrdersWithItemsByStatus(OrderStatusEnum.CART.name(), true);
+        Flux<OrderWithItemsDto> orderEntityList = service.findOrdersWithItemsByStatus(OrderStatusEnum.CART.name(), true, userId);
 
         List<OrderWithItemsDto> orderList = orderEntityList.collectList().block();
 
@@ -145,9 +149,11 @@ public class OrderServiceTest extends SpringBootPostgreSQLBase {
     @Test
     @DisplayName("Изменение статуса заказа  при положительном ответе от платежного сервиса")
     void closeOrderSuccessTest() {
+        Long userId = 1L;
         OrderEntity orderEntity = new OrderEntity();
         orderEntity.setStatus(OrderStatusEnum.CART.name());
         orderEntity.setTotalAmount(BigDecimal.valueOf(105).setScale(2, RoundingMode.HALF_UP));
+        orderEntity.setUserId(userId);
         Mono<OrderEntity> expectedMono = service.save(orderEntity);
         OrderEntity expected = expectedMono.block();
 
@@ -155,11 +161,11 @@ public class OrderServiceTest extends SpringBootPostgreSQLBase {
         balanceApiResponseDto.setCode(BalanceApiEnum.SUCCESS.getCode());
         Mono<BalanceApiResponseDto> balanceApiResponseDtoMono = Mono.just(balanceApiResponseDto);
 
-        when(paymentApiService.formBalanceResponse(any(), eq(false))).thenReturn(balanceApiResponseDtoMono);
+        when(paymentApiService.formBalanceResponse(any(), eq(userId), eq(false))).thenReturn(balanceApiResponseDtoMono);
 
-        service.closeOrder().block();
+        service.closeOrder(userId).block();
 
-        service.closeOrder().block();
+        service.closeOrder(userId).block();
         Mono<OrderEntity> changed = orderRepository.findById(expected.getId());
         assertEquals(OrderStatusEnum.ORDER.name(), changed.block().getStatus());
     }
@@ -167,8 +173,10 @@ public class OrderServiceTest extends SpringBootPostgreSQLBase {
     @Test
     @DisplayName("Изменение статуса заказа при отрицательном ответе от платежного сервиса")
     void closeOrderErrorTest() {
+        Long userId = 1L;
         OrderEntity orderEntity = new OrderEntity();
         orderEntity.setStatus(OrderStatusEnum.CART.name());
+        orderEntity.setUserId(userId);
         orderEntity.setTotalAmount(BigDecimal.valueOf(105).setScale(2, RoundingMode.HALF_UP));
         Mono<OrderEntity> expectedMono = service.save(orderEntity);
         OrderEntity expected = expectedMono.block();
@@ -177,9 +185,9 @@ public class OrderServiceTest extends SpringBootPostgreSQLBase {
         balanceApiResponseDto.setCode(BalanceApiEnum.UNEXPECTED_ERROR.getCode());
         Mono<BalanceApiResponseDto> balanceApiResponseDtoMono = Mono.just(balanceApiResponseDto);
 
-        when(paymentApiService.formBalanceResponse(any(), eq(false))).thenReturn(balanceApiResponseDtoMono);
+        when(paymentApiService.formBalanceResponse(any(), eq(userId), eq(false))).thenReturn(balanceApiResponseDtoMono);
 
-        service.closeOrder().block();
+        service.closeOrder(userId).block();
 
         Mono<OrderEntity> changed = orderRepository.findById(expected.getId());
         assertEquals(OrderStatusEnum.CART.name(), changed.block().getStatus());

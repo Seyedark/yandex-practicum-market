@@ -38,6 +38,7 @@ public class CoordinatorServiceTest {
     @Test
     @DisplayName("Проверка когда первый раз добавляем товар")
     void changeItemsInOrderFirstItemTest() {
+        Long userId = 1L;
         OrderWithItemsDto orderWithItemsDto = new OrderWithItemsDto();
         orderWithItemsDto.setId(1L);
         orderWithItemsDto.setTotalAmount(BigDecimal.ZERO);
@@ -57,14 +58,14 @@ public class CoordinatorServiceTest {
         OrderItemEntity orderItemEntity = new OrderItemEntity();
         Mono<OrderItemEntity> orderItemEntityMono = Mono.just(orderItemEntity);
 
-        when(orderService.findCartOrder(true)).thenReturn(orderWithItemsDtoMono);
+        when(orderService.findCartOrder(userId,true)).thenReturn(orderWithItemsDtoMono);
         when(itemService.findById(itemEntity.getId())).thenReturn(itemEntityMono);
         when(orderService.save(any(OrderEntity.class))).thenReturn(orderEntityMono);
         when(orderItemService.save(any(OrderItemEntity.class))).thenReturn(orderItemEntityMono);
 
-        service.changeItemsInOrder(itemEntity.getId(), ActionEnum.PLUS.name()).block();
+        service.changeItemsInOrder(itemEntity.getId(), ActionEnum.PLUS.name(), userId).block();
 
-        verify(orderService, times(1)).findCartOrder(true);
+        verify(orderService, times(1)).findCartOrder(userId,true);
         verify(itemService, times(1)).findById(itemEntity.getId());
         verify(orderService, times(1)).save(any(OrderEntity.class));
         verify(orderItemService, times(1)).save(any(OrderItemEntity.class));
@@ -74,6 +75,7 @@ public class CoordinatorServiceTest {
     @Test
     @DisplayName("Проверка когда добавляем товар, который уже был")
     void changeItemsInOrderExistItemIncreaseTest() {
+        Long userId = 1L;
         ItemDto itemDto = new ItemDto();
         itemDto.setId(1L);
         itemDto.setPrice(new BigDecimal(BigInteger.ONE));
@@ -97,16 +99,16 @@ public class CoordinatorServiceTest {
         Mono<OrderItemEntity> orderItemEntityMono = Mono.just(orderItemEntity);
 
 
-        when(orderService.findCartOrder(true)).thenReturn(orderWithItemsDtoMono);
+        when(orderService.findCartOrder(userId ,true)).thenReturn(orderWithItemsDtoMono);
         when(itemService.findById(itemEntity.getId())).thenReturn(itemEntityMono);
         when(orderItemService.findByOrderIdAndItemId(orderWithItemsDto.getId(), itemDto.getId())).thenReturn(orderItemEntityMono);
         when(orderService.save(any(OrderEntity.class))).thenReturn(orderEntityMono);
         when(orderItemService.save(any(OrderItemEntity.class))).thenReturn(orderItemEntityMono);
 
 
-        service.changeItemsInOrder(itemEntity.getId(), ActionEnum.PLUS.name()).block();
+        service.changeItemsInOrder(itemEntity.getId(), ActionEnum.PLUS.name(), userId).block();
 
-        verify(orderService, times(1)).findCartOrder(true);
+        verify(orderService, times(1)).findCartOrder(userId, true);
         verify(itemService, times(1)).findById(itemEntity.getId());
         verify(orderItemService, times(1)).findByOrderIdAndItemId(orderWithItemsDto.getId(), itemDto.getId());
         verify(orderService, times(1)).save(any(OrderEntity.class));
@@ -116,6 +118,7 @@ public class CoordinatorServiceTest {
     @Test
     @DisplayName("Проверка когда был товар и мы уменьшаем его кол-во")
     void changeItemsInOrderExistItemDecreaseTest() {
+        Long userId = 1L;
         ItemDto itemDto = new ItemDto();
         itemDto.setId(1L);
         itemDto.setPrice(new BigDecimal(BigInteger.ONE));
@@ -138,15 +141,15 @@ public class CoordinatorServiceTest {
         orderItemEntity.setQuantity(2);
         Mono<OrderItemEntity> orderItemEntityMono = Mono.just(orderItemEntity);
 
-        when(orderService.findCartOrder(true)).thenReturn(orderWithItemsDtoMono);
+        when(orderService.findCartOrder(userId, true)).thenReturn(orderWithItemsDtoMono);
         when(itemService.findById(itemEntity.getId())).thenReturn(itemEntityMono);
         when(orderItemService.findByOrderIdAndItemId(orderWithItemsDto.getId(), itemDto.getId())).thenReturn(orderItemEntityMono);
         when(orderService.save(any(OrderEntity.class))).thenReturn(orderEntityMono);
         when(orderItemService.save(any(OrderItemEntity.class))).thenReturn(orderItemEntityMono);
 
-        service.changeItemsInOrder(itemEntity.getId(), ActionEnum.MINUS.name()).block();
+        service.changeItemsInOrder(itemEntity.getId(), ActionEnum.MINUS.name(), userId).block();
 
-        verify(orderService, times(1)).findCartOrder(true);
+        verify(orderService, times(1)).findCartOrder(userId, true);
         verify(itemService, times(1)).findById(itemEntity.getId());
         verify(orderItemService, times(1)).findByOrderIdAndItemId(orderWithItemsDto.getId(), itemDto.getId());
         verify(orderService, times(1)).save(any(OrderEntity.class));
@@ -156,6 +159,7 @@ public class CoordinatorServiceTest {
     @Test
     @DisplayName("Проверка когда удаляем связь между товаром и заказом")
     void changeItemsInOrderExistItemDeleteItemTest() {
+        Long userId = 1L;
         ItemDto itemDto = new ItemDto();
         itemDto.setId(1L);
         itemDto.setPrice(new BigDecimal(BigInteger.ONE));
@@ -178,15 +182,15 @@ public class CoordinatorServiceTest {
         orderItemEntity.setQuantity(1);
         Mono<OrderItemEntity> orderItemEntityMono = Mono.just(orderItemEntity);
 
-        when(orderService.findCartOrder(true)).thenReturn(orderWithItemsDtoMono);
+        when(orderService.findCartOrder(userId,true)).thenReturn(orderWithItemsDtoMono);
         when(itemService.findById(itemEntity.getId())).thenReturn(itemEntityMono);
         when(orderItemService.findByOrderIdAndItemId(orderWithItemsDto.getId(), itemDto.getId())).thenReturn(orderItemEntityMono);
         when(orderService.save(any(OrderEntity.class))).thenReturn(orderEntityMono);
         when(orderItemService.delete(any(OrderItemEntity.class))).thenReturn(Mono.empty());
 
-        service.changeItemsInOrder(itemEntity.getId(), ActionEnum.DELETE.name()).block();
+        service.changeItemsInOrder(itemEntity.getId(), ActionEnum.DELETE.name(), userId).block();
 
-        verify(orderService, times(1)).findCartOrder(true);
+        verify(orderService, times(1)).findCartOrder(userId, true);
         verify(itemService, times(1)).findById(itemEntity.getId());
         verify(orderItemService, times(1)).findByOrderIdAndItemId(orderWithItemsDto.getId(), itemDto.getId());
         verify(orderService, times(1)).save(any(OrderEntity.class));

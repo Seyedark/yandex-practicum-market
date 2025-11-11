@@ -14,6 +14,7 @@ import java.util.List;
 public class OrderWithItemsDto {
     Long id;
     String status;
+    Long userId;
     BigDecimal totalAmount;
     List<ItemDto> itemList;
 }

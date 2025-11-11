@@ -24,21 +24,21 @@ public class CoordinatorService {
 
 
     @Transactional
-    public Mono<Void> changeItemsInOrder(Long id, String action) {
-        Mono<OrderWithItemsDto> orderWithItemsDtoMono = orderService.findCartOrder(true);
-        ActionEnum actionEnum = ActionEnum.valueOf(action);
-        switch (actionEnum) {
-            case PLUS -> {
-                return addItemToOrder(id, orderWithItemsDtoMono);
+    public Mono<Void> changeItemsInOrder(Long id, String action, Long userId) {
+        Mono<OrderWithItemsDto> orderWithItemsDtoMono = orderService.findCartOrder(userId, true);
+        return orderWithItemsDtoMono.flatMap(orderWithItemsDto -> {
+            ActionEnum actionEnum = ActionEnum.valueOf(action);
+            switch (actionEnum) {
+                case PLUS:
+                    return addItemToOrder(id, Mono.just(orderWithItemsDto));
+                case MINUS:
+                    return decreaseItemQuantity(id, Mono.just(orderWithItemsDto));
+                case DELETE:
+                    return removeItemFromOrder(id, Mono.just(orderWithItemsDto));
+                default:
+                    return Mono.empty();
             }
-            case MINUS -> {
-                return decreaseItemQuantity(id, orderWithItemsDtoMono);
-            }
-            case DELETE -> {
-                return removeItemFromOrder(id, orderWithItemsDtoMono);
-            }
-        }
-        return Mono.empty();
+        });
     }
 
 
@@ -70,6 +70,7 @@ public class CoordinatorService {
                                     OrderEntity orderEntity = new OrderEntity();
                                     orderEntity.setId(orderWithItemsDto.getId());
                                     orderEntity.setStatus(orderWithItemsDto.getStatus());
+                                    orderEntity.setUserId(orderWithItemsDto.getUserId());
                                     orderEntity.setTotalAmount(newTotalAmount);
 
                                     orderItemEntity.setQuantity(orderItemEntity.getQuantity() - 1);
@@ -101,12 +102,11 @@ public class CoordinatorService {
 
     private Mono<Void> initializeNewOrderItemEntity(OrderWithItemsDto orderWithItemsDto, Long itemId) {
         Mono<ItemEntity> itemEntityMono = itemService.findById(itemId);
-
         return itemEntityMono.flatMap(itemEntity -> {
             BigDecimal newTotalAmount = orderWithItemsDto.getTotalAmount().add(itemEntity.getPrice());
-
             OrderEntity orderEntity = new OrderEntity();
             orderEntity.setId(orderWithItemsDto.getId());
+            orderEntity.setUserId(orderWithItemsDto.getUserId());
             orderEntity.setStatus(orderWithItemsDto.getStatus());
             orderEntity.setTotalAmount(newTotalAmount);
 
@@ -114,7 +114,6 @@ public class CoordinatorService {
             orderItemEntity.setItemId(itemId);
             orderItemEntity.setOrderId(orderWithItemsDto.getId());
             orderItemEntity.setQuantity(1);
-
             return orderService.save(orderEntity)
                     .then(orderItemService.save(orderItemEntity))
                     .then();
@@ -134,10 +133,10 @@ public class CoordinatorService {
                     OrderEntity orderEntity = new OrderEntity();
                     orderEntity.setId(orderWithItemsDto.getId());
                     orderEntity.setStatus(orderWithItemsDto.getStatus());
+                    orderEntity.setUserId(orderWithItemsDto.getUserId());
                     orderEntity.setTotalAmount(newTotalAmount);
 
                     orderItemEntity.setQuantity(orderItemEntity.getQuantity() + 1);
-
                     return orderService.save(orderEntity)
                             .then(orderItemService.save(orderItemEntity))
                             .then();
@@ -152,6 +151,7 @@ public class CoordinatorService {
         OrderEntity orderEntity = new OrderEntity();
         orderEntity.setId(orderWithItemsDto.getId());
         orderEntity.setStatus(orderWithItemsDto.getStatus());
+        orderEntity.setUserId(orderWithItemsDto.getUserId());
         orderEntity.setTotalAmount(newTotalAmount);
 
         return orderService.save(orderEntity)

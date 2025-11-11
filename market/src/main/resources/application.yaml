@@ -36,5 +36,19 @@ spring:
     validate-on-migrate: true
     out-of-order: false
 
+  security:
+    oauth2:
+      client:
+        provider:
+          keycloak:
+            issuer-uri: http://localhost:8083/realms/master # Адрес сервера авторизации для получения токена
+        registration:
+          yandex: # Описание клиента OAuth2
+            provider: keycloak
+            authorizationGrantType: client_credentials
+            client-id: market # Клиент созданный в keycloak
+            client-secret: V7jq2PK22Dnki3orqPXH8ADGjPEp02As # Секрет полученный из keycloak
+            scope: profile
+            clientAuthenticationMethod: client_secret_post # Способ передачи секрета
 redis:
   ttl: 5

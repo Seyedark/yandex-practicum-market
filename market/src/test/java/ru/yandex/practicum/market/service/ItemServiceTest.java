@@ -38,6 +38,7 @@ public class ItemServiceTest extends SpringBootPostgreSQLBase {
         OrderWithItemsDto orderWithItemsDto = new OrderWithItemsDto();
         orderWithItemsDto.setItemList(new ArrayList<>());
         orderWithItemsDto.setId(1L);
+        orderWithItemsDto.setUserId(1L);
 
         ItemDto itemDto = new ItemDto();
         itemDto.setId(1L);

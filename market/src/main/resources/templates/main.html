@@ -7,12 +7,14 @@
 </head>
 
 <body>
-<a href="/orders" style="float:right;">
-    <b>ЗАКАЗЫ &cudarrr;</b>
-</a>
-<a href="/cart" style="float:right;">
-    <b>КОРЗИНА &cudarrr;</b>
-</a>
+<div th:if="${isAuthenticated}">
+    <a href="/logout" style="float:right;"><b>ВЫЙТИ &cudarrr;</b></a>
+    <a href="/orders" style="float:right;"><b>ЗАКАЗЫ &cudarrr;</b></a>
+    <a href="/cart" style="float:right;"><b>КОРЗИНА &cudarrr;</b></a>
+</div>
+<div th:unless="${isAuthenticated}">
+    <a href="/login" style="float:right;"><b>ВОЙТИ &cudarrr;</b></a>
+</div>
 <table style="width:70%;margin-left:auto;margin-right:auto;">
     <tr>
         <td>
@@ -85,9 +87,9 @@
                 </tr>
                 <tr>
                     <td>
-                        <form th:action="${'/cart/items/'+item.getId()}" method="post">
+                        <form th:action="${'/cart/items/'+item.getId()}" method="post" th:if="${isAuthenticated}">
                             <input type="hidden" name="form" th:value="main"/>
-                            <button name="action" value="MINUS" th:if="${item.getQuantity()!=0}">-</button>
+                            <button name="action" value="MINUS" th:if="${item.getQuantity()!=0} ">-</button>
                             <span th:text="${item.getQuantity()}"></span>
                             <button name="action" value="PLUS">+</button>
                         </form>

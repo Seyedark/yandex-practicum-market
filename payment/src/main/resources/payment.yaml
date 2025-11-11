@@ -24,6 +24,7 @@ paths:
       operationId: getBalance
       parameters:
         - $ref: '#/components/parameters/PurchaseAmount'
+        - $ref: '#/components/parameters/UserId'
       responses:
         '200':
           description: Успешный ответ
@@ -37,6 +38,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Balance'
+      security:
+        - bearerAuth: []
 
   /balance/withdraw:
     put:
@@ -56,6 +59,10 @@ paths:
                   type: number
                   format: double
                   description: Сумма списания
+                userId:
+                  type: integer
+                  format: int64
+                  description: Уникальный идентификатор пользователя
               required:
                 - amount
       responses:
@@ -71,9 +78,16 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Balance'
-
+      security:
+        - bearerAuth: []
 
 components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
   parameters:
     PurchaseAmount:
       name: purchaseAmount
@@ -83,6 +97,14 @@ components:
       schema:
         type: number
         format: double
+    UserId:
+      name: userId
+      in: query
+      description: Уникальный идентификатор пользователя
+      required: true
+      schema:
+        type: integer
+        format: int64
 
   schemas:
     Balance:

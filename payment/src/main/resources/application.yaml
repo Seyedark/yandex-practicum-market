@@ -1,5 +1,12 @@
 server:
   port: 8081
 
+spring:
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: http://localhost:8083/realms/master
+
 app:
   amount: 1234.56
